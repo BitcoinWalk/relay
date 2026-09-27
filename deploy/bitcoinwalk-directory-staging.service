@@ -1,0 +1,43 @@
+[Unit]
+Description=BitcoinWalk isolated staging city-directory transport
+After=network.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+DynamicUser=yes
+StateDirectory=bitcoinwalk-directory-staging
+StateDirectoryMode=0700
+WorkingDirectory=/var/lib/bitcoinwalk-directory-staging
+ExecStart=/opt/bitcoinwalk-directory-staging/bitcoinwalk-relay
+Environment=RELAY_LISTEN=127.0.0.1:3343
+Environment=RELAY_DB=/var/lib/bitcoinwalk-directory-staging/events.db
+Environment=RELAY_WRITERS=4506e04e4b7079ce07e38e9875678a81ad33a456c696d708ef8e9a2d8c16ba04
+Environment=RELAY_CITY_DIRECTORY_TRANSPORT=staging
+Environment=RELAY_CITY_DIRECTORY_TRANSPORT_CITY=be8514a4-9df0-4159-a517-71f65761cbbe
+Environment=RELAY_CITY_DIRECTORY_TRANSPORT_ANCHORS=/etc/bitcoinwalk-directory/anchors.json
+Environment=RELAY_CITY_DIRECTORY_TRANSPORT_BUNDLE=/etc/bitcoinwalk-directory/memphis-bundle.json
+Environment="RELAY_LANDING_TEXT=BitcoinWalk staging city-directory transport. Public reads; authenticated authority-checked directory updates only."
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+MemoryMax=256M
+TasksMax=64
+
+[Install]
+WantedBy=multi-user.target

@@ -181,6 +181,23 @@ func run() error {
 	}
 	defer db.Close()
 	defer relay.DisableExpirationManager()
+	directoryTransportMode := env("RELAY_CITY_DIRECTORY_TRANSPORT", "")
+	if directoryTransportMode != "" {
+		if env("RELAY_ORGANIZER_MODE", "false") != "false" {
+			return errors.New("city directory transport cannot enable organizer mode")
+		}
+		anchorPath := os.Getenv("RELAY_CITY_DIRECTORY_TRANSPORT_ANCHORS")
+		bundlePath := os.Getenv("RELAY_CITY_DIRECTORY_TRANSPORT_BUNDLE")
+		cityID := os.Getenv("RELAY_CITY_DIRECTORY_TRANSPORT_CITY")
+		if anchorPath == "" || bundlePath == "" || cityID == "" {
+			return errors.New("city directory transport requires anchors, bundle and city")
+		}
+		state, err := configureCityDirectoryTransport(relay, db, anchorPath, bundlePath, cityID, directoryTransportMode)
+		if err != nil {
+			return fmt.Errorf("configure city directory transport: %w", err)
+		}
+		log.Printf("City directory %s transport enabled for %s at sequence %d", directoryTransportMode, cityID, state.Sequence)
+	}
 	var journal *replicaJournal
 	var organizer *organizerPolicy
 	var deliveryTransport replicaTransport

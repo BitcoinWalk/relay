@@ -1,0 +1,6 @@
+5588febe05886ad6d9a5ac4bb06f591ab53315f5825c771a411cbaba25e180e4  bitcoinwalk-relay-directory-staging-0.8.35
+aeb4284b7c98e58afdf230701f615d82cbc116bfe2d375e88c81e6b8c271e337  deploy/bitcoinwalk-directory-staging.service
+5a3584810756b52319e134b22d3060db79330bbda10ca3ab245400c90cdb2b0a  deploy/capture-city-directory-root-0.8.35.mjs
+5619413ba16489f6c3e150d65383ab2f536dfc414758cc706a2cfbaec3835b4e  deploy/city-directory-anchors-0.8.34.json
+312bc3c3359b4a4bd3035613417f49ae7cfb3784c0f657791656e75e92e56861  deploy/city-directory-memphis-root-0.8.34.json
+2deb6213738820f6de08f42a186da944d7c8e27604688899309ea931a1fe1aa4  deploy/install-directory-transport-0.8.35.sh

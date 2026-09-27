@@ -289,6 +289,16 @@ snapshot paths when no signed bundle is configured. Damus, nos.lol and other
 public relays are optional transports, not directory authorities or activation
 dependencies.
 
+`RELAY_CITY_DIRECTORY_TRANSPORT=staging|production` runs a dedicated
+directory-only relay from an exact anchor and owner-signed bundle. It seeds the
+last-known-good chain at startup, preserves every kind-30309 predecessor instead
+of applying normal addressable-event replacement, permits public reads, and
+requires NIP-42 authentication plus current-chain authority for every write.
+Admission is serialized so simultaneous authorized successors cannot both be
+stored. Use a dedicated database and service; never point this mode at the
+organizer or replica stores. The first staging service listens only on
+`127.0.0.1:3343`; public Caddy and DNS activation are separate gates.
+
 Publication, anchor creation, real network mirror fetching and routing changes
 remain separate confirmation-gated increments. Clients must retain an explicit
 trust anchor; a matching UUID alone does not prove ownership or official
