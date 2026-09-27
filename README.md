@@ -184,6 +184,63 @@ The accepted operator rehearsal restarts unchanged live services before testing
 the compacted copies on isolated loopback ports without delivery credentials.
 It never installs a compacted database into a live path.
 
+## Paid-city entitlement boundary
+
+An organizer's `requestedTier: "paid"` preference and an admin city approval
+are deliberately insufficient to provision replication. Provisioning consumes
+an owner-only ledger of signed kind `30305` entitlement records from a separate,
+explicitly configured entitlement authority. That authority must not be the
+relay super-admin.
+
+The replaceable entitlement is scoped to the immutable city UUID and exact plan
+`bitcoinwalk-paid-city-lifetime-v1`. Its signed content carries only status and
+a SHA-256 commitment to externally retained payment evidence; raw invoices,
+preimages and customer payment details do not enter the relay. A newer signed
+revocation supersedes an older activation.
+
+The provisioning planner requires the exact `entitlement-provision-v1`
+confirmation and creates one new owner-only candidate registry file. It refuses
+an existing city or destination and binds the registry entry to the exact
+current entitlement event ID. It neither edits the live registry nor starts a
+receiver. The existing additive migration remains a separate backup-first
+operator step and cannot remove or replace an existing entitlement binding.
+
+Run the planner only with reviewed absolute paths and a separately verified
+destination:
+
+```sh
+RELAY_REPLICA_ENTITLEMENT_PLAN_CURRENT=/etc/bitcoinwalk-replication/registry.json \
+RELAY_REPLICA_ENTITLEMENT_PLAN_LEDGER=/etc/bitcoinwalk-replication/entitlements.json \
+RELAY_REPLICA_ENTITLEMENT_PLAN_CANDIDATE=/var/backups/bitcoinwalk-provisioning/registry.candidate.json \
+RELAY_REPLICA_ENTITLEMENT_PLAN_AUTHORITY='<entitlement-authority-hex-pubkey>' \
+RELAY_REPLICA_ENTITLEMENT_PLAN_CITY='<immutable-city-uuid>' \
+RELAY_REPLICA_ENTITLEMENT_PLAN_DESTINATION='wss://<reviewed-city-relay>/' \
+RELAY_REPLICA_ENTITLEMENT_PLAN_CONFIRM=entitlement-provision-v1 \
+./bitcoinwalk-relay
+```
+
+Successful output contains only city, destination, entitlement event ID and
+registry digests. It does not expose the evidence commitment or payment data.
+
+Activation uses the separate `entitlement-apply-v1` operator mode. It re-reads
+the ledger immediately before mutation and rejects a candidate if the planned
+entitlement was revoked, superseded or replaced. The legacy registry-add mode
+cannot activate entitlement-bound candidates. Because apply advances the
+journal's registry fingerprint, it must run only inside a backup-first deploy
+transaction while the source writer is stopped; the same transaction installs
+the exact candidate registry or restores the journal backup on failure.
+
+Future production source services must set all three values together:
+
+- `RELAY_REPLICA_REQUIRE_ENTITLEMENTS=true`
+- `RELAY_REPLICA_ENTITLEMENT_LEDGER=<owner-only-ledger>`
+- `RELAY_REPLICA_ENTITLEMENT_AUTHORITY=<64-character-hex-pubkey>`
+
+With that gate enabled, startup fails closed unless every configured city is
+bound to its exact current active entitlement. The current Memphis and Nashville
+staging rehearsals intentionally retain their legacy unentitled configuration
+and are not evidence of a paid entitlement.
+
 ## Install on Debian 13
 
 The deployment bundle is intended for `/home/bitcoinwalk/bitcoinwalk-relay-setup` on `213.232.235.138`.

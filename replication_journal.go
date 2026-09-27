@@ -33,8 +33,9 @@ var (
 )
 
 type replicaRegistryCity struct {
-	CityID      string `json:"cityId"`
-	Destination string `json:"destination"`
+	CityID             string `json:"cityId"`
+	Destination        string `json:"destination"`
+	EntitlementEventID string `json:"entitlementEventId,omitempty"`
 }
 
 type replicaRegistryFile struct {
@@ -46,6 +47,7 @@ type replicaRegistryFile struct {
 // are never accepted from Nostr events or browser requests.
 type replicaRegistry struct {
 	destinations map[string]string
+	entitlements map[string]string
 }
 
 func loadReplicaRegistry(path string) (*replicaRegistry, error) {
@@ -72,7 +74,7 @@ func loadReplicaRegistry(path string) (*replicaRegistry, error) {
 	if input.Version != replicaRegistryVersion || len(input.Cities) == 0 || len(input.Cities) > 1000 {
 		return nil, errors.New("invalid replica registry envelope")
 	}
-	registry := &replicaRegistry{destinations: make(map[string]string, len(input.Cities))}
+	registry := &replicaRegistry{destinations: make(map[string]string, len(input.Cities)), entitlements: make(map[string]string, len(input.Cities))}
 	usedDestinations := map[string]bool{}
 	for _, city := range input.Cities {
 		if !uuidPattern.MatchString(city.CityID) {
@@ -86,6 +88,13 @@ func loadReplicaRegistry(path string) (*replicaRegistry, error) {
 			return nil, errors.New("duplicate replica registry city or destination")
 		}
 		registry.destinations[city.CityID] = destination
+		if city.EntitlementEventID != "" {
+			decoded, err := hex.DecodeString(city.EntitlementEventID)
+			if err != nil || len(decoded) != 32 || strings.ToLower(city.EntitlementEventID) != city.EntitlementEventID {
+				return nil, errors.New("invalid replica registry entitlement event")
+			}
+			registry.entitlements[city.CityID] = city.EntitlementEventID
+		}
 		usedDestinations[destination] = true
 	}
 	return registry, nil
@@ -108,10 +117,22 @@ func (r *replicaRegistry) destination(cityID string) (string, bool) {
 	return destination, ok
 }
 
+func (r *replicaRegistry) entitlement(cityID string) (string, bool) {
+	if r == nil {
+		return "", false
+	}
+	eventID, ok := r.entitlements[cityID]
+	return eventID, ok
+}
+
 func (r *replicaRegistry) fingerprint() string {
 	lines := make([]string, 0, len(r.destinations))
 	for cityID, destination := range r.destinations {
-		lines = append(lines, cityID+"="+destination)
+		line := cityID + "=" + destination
+		if entitlementID, ok := r.entitlement(cityID); ok {
+			line += "#" + entitlementID
+		}
+		lines = append(lines, line)
 	}
 	slices.Sort(lines)
 	sum := sha256.Sum256([]byte(strings.Join(lines, "\n")))

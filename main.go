@@ -97,6 +97,12 @@ func newRelay(dbPath string, writers map[nostr.PubKey]bool) (*khatru.Relay, *bol
 }
 
 func run() error {
+	if replicaEntitlementApplyConfigured() {
+		return runReplicaEntitlementApply()
+	}
+	if replicaEntitlementPlanConfigured() {
+		return runReplicaEntitlementPlan()
+	}
 	if os.Getenv("RELAY_REPLICA_REGISTRY_ADD_CURRENT") != "" {
 		return runReplicaRegistryAdd()
 	}
@@ -143,6 +149,9 @@ func run() error {
 	if env("RELAY_CHAT_PILOT", "false") == "true" {
 		return runChatPilot()
 	}
+	if replicaEntitlementRuntimeConfigured() && (env("RELAY_ORGANIZER_MODE", "false") != "true" || os.Getenv("RELAY_REPLICA_JOURNAL") == "" || os.Getenv("RELAY_REPLICA_REGISTRY") == "") {
+		return errors.New("entitlement-required replication requires organizer mode, journal and registry")
+	}
 	listen := env("RELAY_LISTEN", "127.0.0.1:3334")
 	host, _, err := net.SplitHostPort(listen)
 	if err != nil || net.ParseIP(host) == nil || !net.ParseIP(host).IsLoopback() {
@@ -173,6 +182,25 @@ func run() error {
 			registry, err := loadReplicaRegistry(registryPath)
 			if err != nil {
 				return fmt.Errorf("load replica registry: %w", err)
+			}
+			requireEntitlements := env("RELAY_REPLICA_REQUIRE_ENTITLEMENTS", "false")
+			entitlementLedgerPath := os.Getenv("RELAY_REPLICA_ENTITLEMENT_LEDGER")
+			entitlementAuthorityHex := os.Getenv("RELAY_REPLICA_ENTITLEMENT_AUTHORITY")
+			if requireEntitlements != "false" || entitlementLedgerPath != "" || entitlementAuthorityHex != "" {
+				if requireEntitlements != "true" || entitlementLedgerPath == "" || entitlementAuthorityHex == "" {
+					return errors.New("entitlement-required replication needs the exact flag, ledger and authority")
+				}
+				authority, err := nostr.PubKeyFromHex(entitlementAuthorityHex)
+				if err != nil {
+					return errors.New("invalid replica entitlement authority")
+				}
+				ledger, err := loadReplicaEntitlementLedger(entitlementLedgerPath, authority, time.Now())
+				if err != nil {
+					return fmt.Errorf("load replica entitlement ledger: %w", err)
+				}
+				if err := validateEntitledReplicaRegistry(registry, ledger); err != nil {
+					return fmt.Errorf("validate replica entitlements: %w", err)
+				}
 			}
 			journal, err = openReplicaJournal(journalPath, registry, nil)
 			if err != nil {

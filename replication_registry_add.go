@@ -57,6 +57,10 @@ func validateRetainedReplicaRows(tx *bbolt.Tx, current *replicaRegistry, addedCi
 }
 
 func addReplicaRegistryCity(journalPath, currentPath, candidatePath, confirmation string) (replicaRegistryAddResult, error) {
+	return addReplicaRegistryCityWithEntitlement(journalPath, currentPath, candidatePath, confirmation, "")
+}
+
+func addReplicaRegistryCityWithEntitlement(journalPath, currentPath, candidatePath, confirmation, expectedEntitlementID string) (replicaRegistryAddResult, error) {
 	if confirmation != replicaRegistryAddConfirmation {
 		return replicaRegistryAddResult{}, errors.New("replica registry add requires the exact staging confirmation")
 	}
@@ -75,6 +79,11 @@ func addReplicaRegistryCity(journalPath, currentPath, candidatePath, confirmatio
 		if retained, ok := candidate.destination(cityID); !ok || retained != destination {
 			return replicaRegistryAddResult{}, errors.New("replica registry add cannot remove or redirect an existing city")
 		}
+		currentEntitlement, currentBound := current.entitlement(cityID)
+		candidateEntitlement, candidateBound := candidate.entitlement(cityID)
+		if currentBound != candidateBound || currentEntitlement != candidateEntitlement {
+			return replicaRegistryAddResult{}, errors.New("replica registry add cannot remove or replace an existing entitlement binding")
+		}
 	}
 	addedCityID, addedDestination := "", ""
 	for cityID, destination := range candidate.destinations {
@@ -84,6 +93,13 @@ func addReplicaRegistryCity(journalPath, currentPath, candidatePath, confirmatio
 	}
 	if addedCityID == "" {
 		return replicaRegistryAddResult{}, errors.New("replica registry add did not find a new city")
+	}
+	addedEntitlementID, entitlementBound := candidate.entitlement(addedCityID)
+	if expectedEntitlementID == "" && entitlementBound {
+		return replicaRegistryAddResult{}, errors.New("entitlement-bound registry add requires the entitlement apply workflow")
+	}
+	if expectedEntitlementID != "" && (!entitlementBound || addedEntitlementID != expectedEntitlementID) {
+		return replicaRegistryAddResult{}, errors.New("candidate registry does not match the current paid-city entitlement")
 	}
 	info, err := os.Lstat(journalPath)
 	if err != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 || info.Mode().Perm()&0022 != 0 {

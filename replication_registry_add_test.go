@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -93,4 +94,36 @@ func TestReplicaRegistryAddRejectsRedirectRemovalAndBroadChange(t *testing.T) {
 	if _, err := addReplicaRegistryCity(journalPath, currentPath, candidatePath, "wrong"); err == nil {
 		t.Fatal("registry add accepted the wrong confirmation")
 	}
+}
+
+func TestReplicaRegistryAddRejectsEntitlementRebinding(t *testing.T) {
+	dir := t.TempDir()
+	journalPath := filepath.Join(dir, "journal.db")
+	currentPath := filepath.Join(dir, "current.json")
+	firstEntitlement := strings.Repeat("a", 64)
+	writeRegistryFixture(t, currentPath, []replicaRegistryCity{{CityID: cityA, Destination: "wss://one.example/", EntitlementEventID: firstEntitlement}})
+	current, err := loadReplicaRegistry(currentPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	journal, err := openReplicaJournal(journalPath, current, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := journal.Close(); err != nil {
+		t.Fatal(err)
+	}
+	candidatePath := filepath.Join(dir, "candidate.json")
+	writeRegistryFixture(t, candidatePath, []replicaRegistryCity{
+		{CityID: cityA, Destination: "wss://one.example/", EntitlementEventID: strings.Repeat("b", 64)},
+		{CityID: cityB, Destination: "wss://two.example/", EntitlementEventID: strings.Repeat("c", 64)},
+	})
+	if _, err := addReplicaRegistryCity(journalPath, currentPath, candidatePath, replicaRegistryAddConfirmation); err == nil {
+		t.Fatal("registry add replaced an existing entitlement binding")
+	}
+	reopened, err := openReplicaJournal(journalPath, current, nil)
+	if err != nil {
+		t.Fatalf("rejected rebinding altered the journal: %v", err)
+	}
+	reopened.Close()
 }
