@@ -1,0 +1,40 @@
+services:
+  directory:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: bitcoinwalk-directory-2-staging:0.8.37
+    container_name: bitcoinwalk-directory-2-staging
+    init: true
+    restart: unless-stopped
+    read_only: true
+    user: "65532:65532"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 64
+    mem_limit: 256m
+    stop_grace_period: 20s
+    environment:
+      RELAY_LISTEN: 0.0.0.0:3343
+      RELAY_DB: /data/events.db
+      RELAY_WRITERS: 4506e04e4b7079ce07e38e9875678a81ad33a456c696d708ef8e9a2d8c16ba04
+      RELAY_CITY_DIRECTORY_TRANSPORT: staging
+      RELAY_CITY_DIRECTORY_TRANSPORT_CITY: be8514a4-9df0-4159-a517-71f65761cbbe
+      RELAY_CITY_DIRECTORY_TRANSPORT_ANCHORS: /config/anchors.json
+      RELAY_CITY_DIRECTORY_TRANSPORT_BUNDLE: /config/memphis-bundle.json
+      RELAY_LANDING_TEXT: BitcoinWalk secondary staging city-directory transport. Public reads; authenticated authority-checked directory updates only.
+    volumes:
+      - /var/lib/bitcoinwalk-directory-2-staging:/data
+      - /opt/bitcoinwalk-directory-2-staging/anchors.json:/config/anchors.json:ro
+      - /opt/bitcoinwalk-directory-2-staging/memphis-bundle.json:/config/memphis-bundle.json:ro
+    ports:
+      - 127.0.0.1:3343:3343
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true
+    name: root_my_custom_network
