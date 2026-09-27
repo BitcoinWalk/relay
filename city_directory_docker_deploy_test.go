@@ -7,7 +7,7 @@ import (
 )
 
 func TestSecondaryDirectoryDockerDeploymentIsIsolatedAndBackupFirst(t *testing.T) {
-	compose, err := os.ReadFile("deploy/compose.directory-2-staging-0.8.40.yaml")
+	compose, err := os.ReadFile("deploy/compose.directory-2-staging-0.8.41.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -24,7 +24,6 @@ func TestSecondaryDirectoryDockerDeploymentIsIsolatedAndBackupFirst(t *testing.T
 		"expose:",
 		"- \"3343\"",
 		"RELAY_CITY_DIRECTORY_CONTAINER_LISTEN: \"true\"",
-		"RELAY_NAME: BitcoinWalk secondary staging city-directory transport",
 		"/var/lib/bitcoinwalk-directory-2-staging:/data",
 		"name: root_my_custom_network",
 	} {
@@ -40,13 +39,18 @@ func TestSecondaryDirectoryDockerDeploymentIsIsolatedAndBackupFirst(t *testing.T
 	if !strings.Contains(string(dockerfile), "FROM scratch") || !strings.Contains(string(dockerfile), "USER 65532:65532") {
 		t.Fatal("secondary directory image is not scratch-based and non-root")
 	}
-	installer, err := os.ReadFile("deploy/install-directory-2-docker-0.8.40.sh")
+	installer, err := os.ReadFile("deploy/install-directory-2-docker-0.8.41.sh")
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, required := range []string{"docker logs \"$container\"", "container-inspect.failure.json", "container.log", "--allow-private-ws", "root_my_custom_network", "landing.txt", "nip11.json", "unexpected NIP-11 relay name"} {
 		if !strings.Contains(string(installer), required) {
 			t.Fatalf("corrected installer does not retain failure evidence %q", required)
+		}
+	}
+	for _, required := range []string{"BitcoinWalk staging directory relay", "bitcoinwalk-directory-transport-0.8.35"} {
+		if !strings.Contains(string(installer), required) {
+			t.Fatalf("installer does not validate transport-specific metadata %q", required)
 		}
 	}
 }
