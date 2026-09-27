@@ -98,6 +98,9 @@ func newRelay(dbPath string, writers map[nostr.PubKey]bool) (*khatru.Relay, *bol
 }
 
 func run() error {
+	if cityDirectoryAuditConfigured() {
+		return runCityDirectoryAudit()
+	}
 	if replicaStagingEntitlementIssueConfigured() {
 		return runReplicaStagingEntitlementIssue()
 	}

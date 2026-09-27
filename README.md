@@ -251,6 +251,40 @@ record is not payment evidence and must never be copied into the production
 entitlement ledger. The production payment service remains separate and must
 supply its own authority and evidence commitment.
 
+## Portable city endpoint directory
+
+BW-60 begins with an application-specific signed kind `30309` directory chain;
+this is a BitcoinWalk protocol record, not a claim that NIP-30309 is a standard.
+The immutable city UUID and a locally trusted root event anchor the chain. Each
+event binds exact JSON to indexed tags and carries a monotonic sequence, the
+previous event ID, current owner, endpoint operators, one offline recovery key,
+and one primary plus up to seven mirror `wss://` public-event endpoints.
+
+The owner may update authorities and endpoints. An operator may update endpoints
+only. Owner rotation must be signed by the current owner and changes nothing
+else. The predeclared recovery key may replace the owner, preserves endpoints
+and the recovery key, and clears all operators. A rotated owner loses authority.
+Conflicting authorized successors fail closed; malformed or unauthorized relay
+noise cannot manufacture a fork.
+
+The initial audit consumes one owner-controlled anchor file and two to eight
+independently supplied mirror snapshots. Every mirror must resolve the exact
+same current event and state; duplicate paths, stale mirrors, unsafe file modes,
+unknown JSON fields, invalid signatures and non-root WSS URLs are rejected.
+It reads only and does not change the replication registry or live routing:
+
+```sh
+RELAY_CITY_DIRECTORY_AUDIT_ANCHORS=/absolute/path/anchors.json \
+RELAY_CITY_DIRECTORY_AUDIT_MIRRORS=/absolute/path/mirror-a.json,/absolute/path/mirror-b.json \
+RELAY_CITY_DIRECTORY_AUDIT_CITY='<immutable-city-uuid>' \
+./bitcoinwalk-relay
+```
+
+Publication, anchor creation, real network mirror fetching and routing changes
+remain separate confirmation-gated increments. Clients must retain an explicit
+trust anchor; a matching UUID alone does not prove ownership or official
+BitcoinWalk recognition.
+
 ## Install on Debian 13
 
 The deployment bundle is intended for `/home/bitcoinwalk/bitcoinwalk-relay-setup` on `213.232.235.138`.
