@@ -1,0 +1,7 @@
+9c27118b11674d05fd9f46d94b53685e0fb0d6220c3d83a63e5fd62c0af8f646  bitcoinwalk-relay-directory-2-staging-0.8.38
+5805c75a54e64116f0639f2bf95f0a9316c1038a725a5b90d59c4e4234c15980  deploy/Dockerfile.directory-2-staging
+476d2318920a73b7974b3b25bfbea819dadcdf5051071a6343c573f67c172614  deploy/compose.directory-2-staging-0.8.38.yaml
+42eecde1a3a28971b81a16238d1fa55068af4b4d9ed62b3b6eb77e1bf34b2d37  deploy/capture-city-directory-root-0.8.37.py
+5619413ba16489f6c3e150d65383ab2f536dfc414758cc706a2cfbaec3835b4e  deploy/city-directory-anchors-0.8.34.json
+312bc3c3359b4a4bd3035613417f49ae7cfb3784c0f657791656e75e92e56861  deploy/city-directory-memphis-root-0.8.34.json
+4778d8e406dd84e1ee433683c211804d0b71a9a6bd97800f5d9ef9d03c8b83ee  deploy/install-directory-2-docker-0.8.38.sh
