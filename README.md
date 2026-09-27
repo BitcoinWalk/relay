@@ -241,6 +241,16 @@ bound to its exact current active entitlement. The current Memphis and Nashville
 staging rehearsals intentionally retain their legacy unentitled configuration
 and are not evidence of a paid entitlement.
 
+The staging-only issuer mode uses exact confirmation
+`entitlement-staging-issue-v1`, a distinct owner-only authority key and a signed
+`basis=staging-synthetic-v1` tag. It can issue only an explicit active or revoked
+test record into a new successor ledger file and never overwrites one. Release
+`0.8.29` uses this mode only with an isolated synthetic baseline registry and
+journal. A synthetic
+record is not payment evidence and must never be copied into the production
+entitlement ledger. The production payment service remains separate and must
+supply its own authority and evidence commitment.
+
 ## Install on Debian 13
 
 The deployment bundle is intended for `/home/bitcoinwalk/bitcoinwalk-relay-setup` on `213.232.235.138`.

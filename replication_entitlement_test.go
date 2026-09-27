@@ -321,3 +321,120 @@ func TestEntitlementApplyRechecksRevocationBeforeJournalMutation(t *testing.T) {
 	}
 	reopened.Close()
 }
+
+func TestStagingEntitlementIssuerCreatesOneSyntheticOwnerOnlyLedger(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.Chmod(dir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	keyPath := filepath.Join(dir, "staging-authority-key")
+	pubkey, err := initializeReplicaServiceKey(keyPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ledgerPath := filepath.Join(dir, "staging-entitlements.json")
+	now := time.Unix(1800000000, 0)
+	result, err := issueStagingReplicaEntitlement(replicaStagingEntitlementIssueInput{
+		AuthorityKeyPath: keyPath,
+		LedgerPath:       ledgerPath,
+		CityID:           cityB,
+		Status:           replicaEntitlementActive,
+		Confirmation:     replicaEntitlementStagingIssueConfirm,
+		Now:              now,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.CityID != cityB || result.Authority != pubkey.Hex() || len(result.EntitlementEventID) != 64 || result.Status != replicaEntitlementActive || result.Synthetic != true {
+		t.Fatalf("unexpected staging entitlement result: %+v", result)
+	}
+	info, err := os.Stat(ledgerPath)
+	if err != nil || info.Mode().Perm() != 0600 {
+		t.Fatalf("staging ledger is not owner-only: %v %v", info, err)
+	}
+	ledger, err := loadReplicaEntitlementLedger(ledgerPath, pubkey, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, active := ledger.active(cityB)
+	if !active || record.Event.ID.Hex() != result.EntitlementEventID {
+		t.Fatal("issued staging entitlement was not the exact active ledger event")
+	}
+	if record.Content.EvidenceDigest != stagingEntitlementEvidenceDigest(cityB) {
+		t.Fatal("staging evidence commitment is not the fixed synthetic commitment")
+	}
+	if !exactEntitlementTag(record.Event, "basis", replicaEntitlementStagingBasis) {
+		t.Fatal("staging entitlement is not explicitly tagged as synthetic")
+	}
+	revokedPath := filepath.Join(dir, "staging-entitlements-revoked.json")
+	revokedResult, err := issueStagingReplicaEntitlement(replicaStagingEntitlementIssueInput{
+		AuthorityKeyPath: keyPath, SourceLedgerPath: ledgerPath, LedgerPath: revokedPath,
+		CityID: cityB, Status: replicaEntitlementRevoked,
+		Confirmation: replicaEntitlementStagingIssueConfirm, Now: now.Add(time.Second),
+	})
+	if err != nil || revokedResult.Status != replicaEntitlementRevoked {
+		t.Fatalf("staging issuer could not create an immutable revoked successor: %+v %v", revokedResult, err)
+	}
+	revokedLedger, err := loadReplicaEntitlementLedger(revokedPath, pubkey, now.Add(time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, active := revokedLedger.active(cityB); active {
+		t.Fatal("revoked successor ledger retained an active entitlement")
+	}
+	data, err := os.ReadFile(revokedPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var successor replicaEntitlementLedgerFile
+	if err := json.Unmarshal(data, &successor); err != nil || len(successor.Events) != 2 {
+		t.Fatalf("successor ledger did not retain immutable history: %v %v", len(successor.Events), err)
+	}
+	if _, err := issueStagingReplicaEntitlement(replicaStagingEntitlementIssueInput{
+		AuthorityKeyPath: keyPath, LedgerPath: ledgerPath, CityID: cityB, Status: replicaEntitlementActive,
+		Confirmation: replicaEntitlementStagingIssueConfirm, Now: now,
+	}); err == nil {
+		t.Fatal("staging issuer overwrote an existing ledger")
+	}
+}
+
+func TestStagingEntitlementIssuerRejectsUnsafeInputsWithoutLedger(t *testing.T) {
+	for _, test := range []struct {
+		name         string
+		cityID       string
+		status       string
+		confirmation string
+		unsafeParent bool
+	}{
+		{name: "invalid city", cityID: "not-a-city", status: replicaEntitlementActive, confirmation: replicaEntitlementStagingIssueConfirm},
+		{name: "invalid status", cityID: cityB, status: "paid", confirmation: replicaEntitlementStagingIssueConfirm},
+		{name: "wrong confirmation", cityID: cityB, status: replicaEntitlementActive, confirmation: "payment-received"},
+		{name: "writable parent", cityID: cityB, status: replicaEntitlementActive, confirmation: replicaEntitlementStagingIssueConfirm, unsafeParent: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			dir := t.TempDir()
+			mode := os.FileMode(0700)
+			if test.unsafeParent {
+				mode = 0777
+			}
+			if err := os.Chmod(dir, mode); err != nil {
+				t.Fatal(err)
+			}
+			keyPath := filepath.Join(t.TempDir(), "staging-authority-key")
+			if _, err := initializeReplicaServiceKey(keyPath); err != nil {
+				t.Fatal(err)
+			}
+			ledgerPath := filepath.Join(dir, "ledger.json")
+			_, err := issueStagingReplicaEntitlement(replicaStagingEntitlementIssueInput{
+				AuthorityKeyPath: keyPath, LedgerPath: ledgerPath, CityID: test.cityID, Status: test.status,
+				Confirmation: test.confirmation, Now: time.Unix(1800000000, 0),
+			})
+			if err == nil {
+				t.Fatal("unsafe staging entitlement input was accepted")
+			}
+			if _, statErr := os.Lstat(ledgerPath); !os.IsNotExist(statErr) {
+				t.Fatalf("rejected staging issue retained a ledger: %v", statErr)
+			}
+		})
+	}
+}

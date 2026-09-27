@@ -97,6 +97,9 @@ func newRelay(dbPath string, writers map[nostr.PubKey]bool) (*khatru.Relay, *bol
 }
 
 func run() error {
+	if replicaStagingEntitlementIssueConfigured() {
+		return runReplicaStagingEntitlementIssue()
+	}
 	if replicaEntitlementApplyConfigured() {
 		return runReplicaEntitlementApply()
 	}
