@@ -172,3 +172,22 @@ func TestCityDirectoryRejectsEscalationForksAndInvalidScope(t *testing.T) {
 		t.Fatal("unanchored city root accepted")
 	}
 }
+
+func TestMemphisCityDirectoryRootAcceptance(t *testing.T) {
+	const raw = `{"content":"{\"version\":1,\"cityId\":\"be8514a4-9df0-4159-a517-71f65761cbbe\",\"sequence\":0,\"action\":\"establish\",\"previousEventId\":\"\",\"ownerPubkey\":\"4506e04e4b7079ce07e38e9875678a81ad33a456c696d708ef8e9a2d8c16ba04\",\"operatorPubkeys\":[],\"recoveryPubkeys\":[\"74d0c61ca913765c188dfc2265d27bcb401a1906ebd79c901dc977a69a2189f0\"],\"publicRelays\":[{\"url\":\"wss://replica-staging.bitcoinwalk.org/\",\"role\":\"primary\"}]}","created_at":1790530495,"id":"d16d969d0bf77c1a71453005b551ab7e2693d293888c2119928df93a69b21a79","kind":30309,"pubkey":"4506e04e4b7079ce07e38e9875678a81ad33a456c696d708ef8e9a2d8c16ba04","sig":"065acfbf2e21980339f98b3a027d0e2187808dbb83b5fe7483803bd55fdb0950b97a7c1ac5a9ccc7a2a197836b7a74f36cadbb4f7512e993c9a937e88a5c4ee6","tags":[["d","be8514a4-9df0-4159-a517-71f65761cbbe"],["i","be8514a4-9df0-4159-a517-71f65761cbbe"],["sequence","0"],["action","establish"],["p","4506e04e4b7079ce07e38e9875678a81ad33a456c696d708ef8e9a2d8c16ba04","","owner"],["p","74d0c61ca913765c188dfc2265d27bcb401a1906ebd79c901dc977a69a2189f0","","recovery"],["r","wss://replica-staging.bitcoinwalk.org/","primary"]]}`
+	var event nostr.Event
+	if err := json.Unmarshal([]byte(raw), &event); err != nil {
+		t.Fatal(err)
+	}
+	state, err := resolveCityDirectory([]nostr.Event{event}, cityDirectoryAnchor{
+		CityID:             "be8514a4-9df0-4159-a517-71f65761cbbe",
+		RootEventID:        "d16d969d0bf77c1a71453005b551ab7e2693d293888c2119928df93a69b21a79",
+		InitialOwnerPubkey: "4506e04e4b7079ce07e38e9875678a81ad33a456c696d708ef8e9a2d8c16ba04",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.CurrentEventID != event.ID.Hex() || state.Sequence != 0 || state.ChainLength != 1 || state.OwnerPubkey != event.PubKey.Hex() || !slices.Equal(state.RecoveryPubkeys, []string{"74d0c61ca913765c188dfc2265d27bcb401a1906ebd79c901dc977a69a2189f0"}) || !slices.Equal(state.PublicRelays, []cityPublicRelay{{URL: "wss://replica-staging.bitcoinwalk.org/", Role: "primary"}}) {
+		t.Fatalf("unexpected Memphis root state: %#v", state)
+	}
+}

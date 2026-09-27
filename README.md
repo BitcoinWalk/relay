@@ -267,18 +267,27 @@ and the recovery key, and clears all operators. A rotated owner loses authority.
 Conflicting authorized successors fail closed; malformed or unauthorized relay
 noise cannot manufacture a fork.
 
-The initial audit consumes one owner-controlled anchor file and two to eight
-independently supplied mirror snapshots. Every mirror must resolve the exact
-same current event and state; duplicate paths, stale mirrors, unsafe file modes,
+The bootstrap audit consumes one owner-controlled anchor file and an exact
+owner-signed snapshot bundled with the release. Zero to eight independently
+captured relay snapshots may attest to that bundle, but public relay
+availability is never required to validate or retain the last-known-good
+directory state. Every supplied attestation must resolve to the bundle's exact
+current event and state; duplicate paths, stale attestations, unsafe file modes,
 unknown JSON fields, invalid signatures and non-root WSS URLs are rejected.
 It reads only and does not change the replication registry or live routing:
 
 ```sh
 RELAY_CITY_DIRECTORY_AUDIT_ANCHORS=/absolute/path/anchors.json \
-RELAY_CITY_DIRECTORY_AUDIT_MIRRORS=/absolute/path/mirror-a.json,/absolute/path/mirror-b.json \
+RELAY_CITY_DIRECTORY_AUDIT_BUNDLE=/absolute/path/signed-bundle.json \
+RELAY_CITY_DIRECTORY_AUDIT_MIRRORS=/absolute/path/optional-attestation.json \
 RELAY_CITY_DIRECTORY_AUDIT_CITY='<immutable-city-uuid>' \
 ./bitcoinwalk-relay
 ```
+
+The separate mirror-consensus mode still requires two to eight independent
+snapshot paths when no signed bundle is configured. Damus, nos.lol and other
+public relays are optional transports, not directory authorities or activation
+dependencies.
 
 Publication, anchor creation, real network mirror fetching and routing changes
 remain separate confirmation-gated increments. Clients must retain an explicit

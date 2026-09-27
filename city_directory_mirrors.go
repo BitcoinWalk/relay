@@ -28,6 +28,12 @@ type cityDirectoryMirrorAudit struct {
 	MirrorCount int `json:"mirrorCount"`
 }
 
+type cityDirectoryBundleAudit struct {
+	cityDirectoryState
+	BundleVerified   bool `json:"bundleVerified"`
+	AttestationCount int  `json:"attestationCount"`
+}
+
 func readStrictDirectoryFile(path string, limit int64, output any) error {
 	if !filepath.IsAbs(path) || filepath.Clean(path) != path {
 		return errors.New("city directory input requires a clean absolute path")
@@ -91,6 +97,19 @@ func equalCityDirectoryStates(a, b cityDirectoryState) bool {
 	return a.Version == b.Version && a.CityID == b.CityID && a.CurrentEventID == b.CurrentEventID && a.Sequence == b.Sequence && a.OwnerPubkey == b.OwnerPubkey && a.ChainLength == b.ChainLength && slices.Equal(a.OperatorPubkeys, b.OperatorPubkeys) && slices.Equal(a.RecoveryPubkeys, b.RecoveryPubkeys) && slices.Equal(a.PublicRelays, b.PublicRelays)
 }
 
+func normalizeCityDirectoryState(state cityDirectoryState) cityDirectoryState {
+	if state.OperatorPubkeys == nil {
+		state.OperatorPubkeys = []string{}
+	}
+	if state.RecoveryPubkeys == nil {
+		state.RecoveryPubkeys = []string{}
+	}
+	if state.PublicRelays == nil {
+		state.PublicRelays = []cityPublicRelay{}
+	}
+	return state
+}
+
 func auditCityDirectoryMirrors(anchorPath string, mirrorPaths []string, cityID string) (cityDirectoryMirrorAudit, error) {
 	var result cityDirectoryMirrorAudit
 	if !uuidPattern.MatchString(cityID) || len(mirrorPaths) < 2 || len(mirrorPaths) > 8 {
@@ -125,34 +144,98 @@ func auditCityDirectoryMirrors(anchorPath string, mirrorPaths []string, cityID s
 			return result, errors.New("city directory mirrors disagree")
 		}
 	}
-	return cityDirectoryMirrorAudit{cityDirectoryState: agreed, MirrorCount: len(mirrorPaths)}, nil
+	return cityDirectoryMirrorAudit{cityDirectoryState: normalizeCityDirectoryState(agreed), MirrorCount: len(mirrorPaths)}, nil
+}
+
+func auditCityDirectoryBundle(anchorPath, bundlePath string, attestationPaths []string, cityID string) (cityDirectoryBundleAudit, error) {
+	var result cityDirectoryBundleAudit
+	if !uuidPattern.MatchString(cityID) || len(attestationPaths) > 8 {
+		return result, errors.New("city directory bundle audit requires one city and zero to eight attestations")
+	}
+	anchors, err := loadCityDirectoryAnchors(anchorPath)
+	if err != nil {
+		return result, err
+	}
+	anchor, ok := anchors[cityID]
+	if !ok {
+		return result, errors.New("city directory has no trusted anchor")
+	}
+	bundleEvents, err := loadCityDirectoryMirror(bundlePath)
+	if err != nil {
+		return result, err
+	}
+	agreed, err := resolveCityDirectory(bundleEvents, anchor)
+	if err != nil {
+		return result, err
+	}
+	seenPaths := map[string]bool{bundlePath: true}
+	for _, path := range attestationPaths {
+		if seenPaths[path] {
+			return result, errors.New("duplicate city directory bundle or attestation path")
+		}
+		seenPaths[path] = true
+		events, err := loadCityDirectoryMirror(path)
+		if err != nil {
+			return result, err
+		}
+		state, err := resolveCityDirectory(events, anchor)
+		if err != nil {
+			return result, err
+		}
+		if !equalCityDirectoryStates(agreed, state) {
+			return result, errors.New("city directory attestation disagrees with signed bundle")
+		}
+	}
+	return cityDirectoryBundleAudit{cityDirectoryState: normalizeCityDirectoryState(agreed), BundleVerified: true, AttestationCount: len(attestationPaths)}, nil
 }
 
 func cityDirectoryAuditConfigured() bool {
-	return os.Getenv("RELAY_CITY_DIRECTORY_AUDIT_ANCHORS") != "" || os.Getenv("RELAY_CITY_DIRECTORY_AUDIT_MIRRORS") != "" || os.Getenv("RELAY_CITY_DIRECTORY_AUDIT_CITY") != ""
+	return os.Getenv("RELAY_CITY_DIRECTORY_AUDIT_ANCHORS") != "" || os.Getenv("RELAY_CITY_DIRECTORY_AUDIT_BUNDLE") != "" || os.Getenv("RELAY_CITY_DIRECTORY_AUDIT_MIRRORS") != "" || os.Getenv("RELAY_CITY_DIRECTORY_AUDIT_CITY") != ""
 }
 
-func runCityDirectoryAudit() error {
-	anchorPath := os.Getenv("RELAY_CITY_DIRECTORY_AUDIT_ANCHORS")
-	cityID := os.Getenv("RELAY_CITY_DIRECTORY_AUDIT_CITY")
-	rawMirrors := os.Getenv("RELAY_CITY_DIRECTORY_AUDIT_MIRRORS")
-	if anchorPath == "" || cityID == "" || rawMirrors == "" {
-		return errors.New("city directory audit requires anchors, mirrors and city")
+func parseCityDirectoryMirrorPaths(raw string, allowEmpty bool) ([]string, error) {
+	if raw == "" {
+		if allowEmpty {
+			return nil, nil
+		}
+		return nil, errors.New("city directory audit requires mirror paths")
 	}
-	parts := strings.Split(rawMirrors, ",")
+	parts := strings.Split(raw, ",")
 	mirrors := make([]string, 0, len(parts))
 	for _, part := range parts {
 		path := strings.TrimSpace(part)
 		if path == "" || path != part {
-			return errors.New("city directory mirror paths must be non-empty and comma-separated without whitespace")
+			return nil, errors.New("city directory mirror paths must be non-empty and comma-separated without whitespace")
 		}
 		mirrors = append(mirrors, path)
 	}
-	result, err := auditCityDirectoryMirrors(anchorPath, mirrors, cityID)
+	return mirrors, nil
+}
+
+func runCityDirectoryAudit() error {
+	anchorPath := os.Getenv("RELAY_CITY_DIRECTORY_AUDIT_ANCHORS")
+	bundlePath := os.Getenv("RELAY_CITY_DIRECTORY_AUDIT_BUNDLE")
+	cityID := os.Getenv("RELAY_CITY_DIRECTORY_AUDIT_CITY")
+	rawMirrors := os.Getenv("RELAY_CITY_DIRECTORY_AUDIT_MIRRORS")
+	if anchorPath == "" || cityID == "" {
+		return errors.New("city directory audit requires anchors and city")
+	}
+	mirrors, err := parseCityDirectoryMirrorPaths(rawMirrors, bundlePath != "")
 	if err != nil {
 		return err
 	}
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
+	if bundlePath != "" {
+		result, err := auditCityDirectoryBundle(anchorPath, bundlePath, mirrors, cityID)
+		if err != nil {
+			return err
+		}
+		return encoder.Encode(result)
+	}
+	result, err := auditCityDirectoryMirrors(anchorPath, mirrors, cityID)
+	if err != nil {
+		return err
+	}
 	return encoder.Encode(result)
 }

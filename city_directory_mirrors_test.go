@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"fiatjaf.com/nostr"
@@ -76,5 +77,39 @@ func TestCityDirectoryMirrorFilesAreStrictAndOwnerControlled(t *testing.T) {
 	writeDirectoryJSON(t, two, map[string]any{"version": 1, "events": []nostr.Event{root}, "unexpected": true})
 	if _, err := auditCityDirectoryMirrors(anchors, []string{one, two}, cityA); err == nil {
 		t.Fatal("unknown mirror field accepted")
+	}
+}
+
+func TestCityDirectoryBundleIsOfflineAuthorityWithOptionalAttestations(t *testing.T) {
+	owner, recovery := nostr.Generate(), nostr.Generate()
+	ownerPK, recoveryPK := nostr.GetPublicKey(owner), nostr.GetPublicKey(recovery)
+	root := directoryEvent(t, owner, directoryContent(cityA, 0, "establish", "", ownerPK, nil, []nostr.PubKey{recoveryPK}, []cityPublicRelay{{URL: "wss://city.example/", Role: "primary"}}), 0)
+	dir := t.TempDir()
+	anchors := filepath.Join(dir, "anchors.json")
+	bundle := filepath.Join(dir, "bundle.json")
+	attestation := filepath.Join(dir, "attestation.json")
+	writeDirectoryJSON(t, anchors, cityDirectoryAnchorFile{Version: 1, Cities: []cityDirectoryAnchor{{CityID: cityA, RootEventID: root.ID.Hex(), InitialOwnerPubkey: ownerPK.Hex()}}})
+	writeDirectoryJSON(t, bundle, cityDirectoryMirrorFile{Version: 1, Events: []nostr.Event{root}})
+	writeDirectoryJSON(t, attestation, cityDirectoryMirrorFile{Version: 1, Events: []nostr.Event{root}})
+
+	result, err := auditCityDirectoryBundle(anchors, bundle, nil, cityA)
+	if err != nil || !result.BundleVerified || result.AttestationCount != 0 || result.CurrentEventID != root.ID.Hex() {
+		t.Fatalf("offline signed bundle rejected: %#v %v", result, err)
+	}
+	encoded, err := json.Marshal(result)
+	if err != nil || !strings.Contains(string(encoded), `"operatorPubkeys":[]`) {
+		t.Fatalf("empty directory authority must serialize as an array: %s %v", encoded, err)
+	}
+	result, err = auditCityDirectoryBundle(anchors, bundle, []string{attestation}, cityA)
+	if err != nil || result.AttestationCount != 1 || result.CurrentEventID != root.ID.Hex() {
+		t.Fatalf("matching optional attestation rejected: %#v %v", result, err)
+	}
+
+	otherOwner := nostr.Generate()
+	otherOwnerPK := nostr.GetPublicKey(otherOwner)
+	otherRoot := directoryEvent(t, otherOwner, directoryContent(cityA, 0, "establish", "", otherOwnerPK, nil, []nostr.PubKey{recoveryPK}, []cityPublicRelay{{URL: "wss://other.example/", Role: "primary"}}), 1)
+	writeDirectoryJSON(t, attestation, cityDirectoryMirrorFile{Version: 1, Events: []nostr.Event{otherRoot}})
+	if _, err := auditCityDirectoryBundle(anchors, bundle, []string{attestation}, cityA); err == nil {
+		t.Fatal("conflicting optional attestation accepted")
 	}
 }

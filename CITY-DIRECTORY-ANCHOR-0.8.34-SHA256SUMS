@@ -1,0 +1,5 @@
+f6734bfe4b32ffa627e3060ec2049fa8220e891b1f1b7020045e2a47aa23b363  bitcoinwalk-city-directory-audit-0.8.34
+b18fc0bb1188a8c22d7efdaae94258b2329544ea4d7e0f4ad3d6009233cee0df  deploy/capture-city-directory-root-0.8.34.mjs
+5619413ba16489f6c3e150d65383ab2f536dfc414758cc706a2cfbaec3835b4e  deploy/city-directory-anchors-0.8.34.json
+312bc3c3359b4a4bd3035613417f49ae7cfb3784c0f657791656e75e92e56861  deploy/city-directory-memphis-root-0.8.34.json
+14aa0fded7f48be50412a64b677faadfa4d028423f64faebea71a499d51829a8  deploy/install-city-directory-anchor-0.8.34.sh
