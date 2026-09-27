@@ -1,0 +1,8 @@
+DIRECTORY_STAGING_HOST {
+	reverse_proxy 127.0.0.1:3343 {
+		# Bind Khatru's NIP-42 relay URL to the public TLS endpoint.
+		header_up X-Forwarded-Host DIRECTORY_STAGING_HOST
+		header_up X-Forwarded-Proto https
+		header_up -Forwarded
+	}
+}

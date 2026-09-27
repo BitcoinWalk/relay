@@ -1,0 +1,3 @@
+2265c56b17f92339fbc519ce1f464920bd1cb863bc376b0876ca8caaad6190a4  deploy/Caddyfile.directory-staging
+5a3584810756b52319e134b22d3060db79330bbda10ca3ab245400c90cdb2b0a  deploy/capture-city-directory-root-0.8.35.mjs
+6e59e52b440c12419c705db35362a388af3d7e1cd1702577dd794590d2ae2104  deploy/activate-directory-tls-0.8.36.sh
