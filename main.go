@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -155,6 +156,13 @@ func run() error {
 	if replicaEntitlementRuntimeConfigured() && (env("RELAY_ORGANIZER_MODE", "false") != "true" || os.Getenv("RELAY_REPLICA_JOURNAL") == "" || os.Getenv("RELAY_REPLICA_REGISTRY") == "") {
 		return errors.New("entitlement-required replication requires organizer mode, journal and registry")
 	}
+	reconciliationAudit := env("RELAY_REPLICA_RECONCILIATION_AUDIT", "false")
+	if reconciliationAudit != "false" && reconciliationAudit != "true" {
+		return errors.New("RELAY_REPLICA_RECONCILIATION_AUDIT must be true or false")
+	}
+	if reconciliationAudit == "true" && (env("RELAY_ORGANIZER_MODE", "false") != "true" || os.Getenv("RELAY_REPLICA_JOURNAL") == "" || os.Getenv("RELAY_REPLICA_REGISTRY") == "") {
+		return errors.New("replica reconciliation audit requires organizer mode, journal and registry")
+	}
 	listen := env("RELAY_LISTEN", "127.0.0.1:3334")
 	host, _, err := net.SplitHostPort(listen)
 	if err != nil || net.ParseIP(host) == nil || !net.ParseIP(host).IsLoopback() {
@@ -208,6 +216,17 @@ func run() error {
 			journal, err = openReplicaJournal(journalPath, registry, nil)
 			if err != nil {
 				return fmt.Errorf("open replica journal: %w", err)
+			}
+			if reconciliationAudit == "true" {
+				report, auditErr := auditReplicaReconciliation(organizer, journal)
+				closeErr := journal.Close()
+				if auditErr != nil {
+					return fmt.Errorf("audit replica reconciliation: %w", auditErr)
+				}
+				if closeErr != nil {
+					return fmt.Errorf("close replica journal after audit: %w", closeErr)
+				}
+				return json.NewEncoder(os.Stdout).Encode(report)
 			}
 			recovered, err := organizer.recoverReplicaJournal(journal)
 			if err != nil {
