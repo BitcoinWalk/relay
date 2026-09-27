@@ -7,8 +7,8 @@ test "$(id -u)" -eq 0 || { echo 'Run with sudo.' >&2; exit 1; }
 test "$#" -eq 0 || { echo "Usage: $0" >&2; exit 1; }
 cd "$(dirname "$0")/.."
 
-manifest=REPLICA-ENTITLEMENT-REHEARSAL-0.8.29-SHA256SUMS
-artifact=./bitcoinwalk-relay-replica-entitlement-0.8.29
+manifest=REPLICA-ENTITLEMENT-REHEARSAL-0.8.30-SHA256SUMS
+artifact=./bitcoinwalk-relay-replica-entitlement-0.8.30
 source_target=/opt/bitcoinwalk-relay/bitcoinwalk-relay
 source_db=/var/lib/bitcoinwalk-relay/events.db
 source_journal=/var/lib/bitcoinwalk-relay/replication-journal.db
@@ -72,6 +72,7 @@ if [ -e "$authority_key" ];then cp -p "$authority_key" "$backup/preexisting-stag
  sha256sum source-events.db source-replication-journal.db live-registry.json live-source-binary >SHA256SUMS
  if [ -e preexisting-staging-authority-key ];then sha256sum preexisting-staging-authority-key >>SHA256SUMS;fi
 )
+journal_digest_before=$(bolt_digest "$backup/source-replication-journal.db")
 echo "Consistent pre-rehearsal backup created: $backup"
 systemctl start bitcoinwalk-relay.service
 until curl --fail --silent --max-time 2 http://127.0.0.1:3334/healthz >/dev/null;do sleep 1;done
@@ -129,9 +130,12 @@ wait_health
 stop_isolated
 
 test "$(digest "$registry")" = "$(digest "$backup/live-registry.json")"
-test "$(bolt_digest "$source_journal")" = "$(bolt_digest "$backup/source-replication-journal.db")"
-systemctl is-active --quiet bitcoinwalk-relay.service
+systemctl stop bitcoinwalk-relay.service
+journal_digest_after=$(bolt_digest "$source_journal")
+systemctl start bitcoinwalk-relay.service
 curl --fail --silent --max-time 2 http://127.0.0.1:3334/healthz >/dev/null
+test "$journal_digest_after" = "$journal_digest_before"
+systemctl is-active --quiet bitcoinwalk-relay.service
 (
  cd "$backup"
  sha256sum base-entitlement-result.json active-entitlement-result.json plan-result.json apply-result.json revoked-entitlement-result.json active-start-1.log active-start-2.log revoked-start.log active-start-after-rejection.log isolated/registry.base.json isolated/registry.candidate.json isolated/registry.active.json isolated/entitlements.base.json isolated/entitlements.active.json isolated/entitlements.revoked.json isolated/events.db isolated/journal.db >>SHA256SUMS

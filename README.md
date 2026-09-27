@@ -245,7 +245,7 @@ The staging-only issuer mode uses exact confirmation
 `entitlement-staging-issue-v1`, a distinct owner-only authority key and a signed
 `basis=staging-synthetic-v1` tag. It can issue only an explicit active or revoked
 test record into a new successor ledger file and never overwrites one. Release
-`0.8.29` uses this mode only with an isolated synthetic baseline registry and
+`0.8.30` uses this mode only with an isolated synthetic baseline registry and
 journal. A synthetic
 record is not payment evidence and must never be copied into the production
 entitlement ledger. The production payment service remains separate and must

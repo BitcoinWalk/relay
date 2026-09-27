@@ -438,3 +438,17 @@ func TestStagingEntitlementIssuerRejectsUnsafeInputsWithoutLedger(t *testing.T) 
 		})
 	}
 }
+
+func TestEntitlementRehearsalAuditsLiveJournalOnlyWhileSourceStopped(t *testing.T) {
+	data, err := os.ReadFile("deploy/rehearse-entitlement-provisioning-0.8.30.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := string(data)
+	sequence := "systemctl stop bitcoinwalk-relay.service\n" +
+		"journal_digest_after=$(bolt_digest \"$source_journal\")\n" +
+		"systemctl start bitcoinwalk-relay.service"
+	if !strings.Contains(script, sequence) {
+		t.Fatal("live journal audit is not bounded by a stopped source writer")
+	}
+}
