@@ -7,8 +7,8 @@ test "$(id -u)" -eq 0 || { echo 'Run with sudo.' >&2; exit 1; }
 test "$#" -eq 0 || { echo "Usage: $0" >&2; exit 1; }
 cd "$(dirname "$0")/.."
 
-manifest=REPLICA-ENTITLEMENT-REHEARSAL-0.8.30-SHA256SUMS
-artifact=./bitcoinwalk-relay-replica-entitlement-0.8.30
+manifest=REPLICA-ENTITLEMENT-REHEARSAL-0.8.31-SHA256SUMS
+artifact=./bitcoinwalk-relay-replica-entitlement-0.8.31
 source_target=/opt/bitcoinwalk-relay/bitcoinwalk-relay
 source_db=/var/lib/bitcoinwalk-relay/events.db
 source_journal=/var/lib/bitcoinwalk-relay/replication-journal.db
@@ -26,6 +26,12 @@ bolt_digest(){ RELAY_REPLICA_DB_DIGEST="$1" "$artifact"; }
 wait_health(){
  attempt=0
  until curl --fail --silent --max-time 2 "http://127.0.0.1:$port/healthz" >/dev/null;do
+  attempt=$((attempt+1));test "$attempt" -lt 30||return 1;sleep 1
+ done
+}
+wait_source_health(){
+ attempt=0
+ until curl --fail --silent --max-time 2 http://127.0.0.1:3334/healthz >/dev/null;do
   attempt=$((attempt+1));test "$attempt" -lt 30||return 1;sleep 1
  done
 }
@@ -75,7 +81,7 @@ if [ -e "$authority_key" ];then cp -p "$authority_key" "$backup/preexisting-stag
 journal_digest_before=$(bolt_digest "$backup/source-replication-journal.db")
 echo "Consistent pre-rehearsal backup created: $backup"
 systemctl start bitcoinwalk-relay.service
-until curl --fail --silent --max-time 2 http://127.0.0.1:3334/healthz >/dev/null;do sleep 1;done
+wait_source_health
 
 if [ ! -e "$authority_key" ];then
  umask 077
@@ -133,7 +139,7 @@ test "$(digest "$registry")" = "$(digest "$backup/live-registry.json")"
 systemctl stop bitcoinwalk-relay.service
 journal_digest_after=$(bolt_digest "$source_journal")
 systemctl start bitcoinwalk-relay.service
-curl --fail --silent --max-time 2 http://127.0.0.1:3334/healthz >/dev/null
+wait_source_health
 test "$journal_digest_after" = "$journal_digest_before"
 systemctl is-active --quiet bitcoinwalk-relay.service
 (
