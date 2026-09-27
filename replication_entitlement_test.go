@@ -439,30 +439,29 @@ func TestStagingEntitlementIssuerRejectsUnsafeInputsWithoutLedger(t *testing.T) 
 	}
 }
 
-func TestEntitlementRehearsalAuditsLiveJournalOnlyWhileSourceStopped(t *testing.T) {
-	data, err := os.ReadFile("deploy/rehearse-entitlement-provisioning-0.8.31.sh")
+func TestEntitlementRehearsalUsesPublicStateInsteadOfMutableJournalDigest(t *testing.T) {
+	data, err := os.ReadFile("deploy/rehearse-entitlement-provisioning-0.8.32.sh")
 	if err != nil {
 		t.Fatal(err)
 	}
 	script := string(data)
-	sequence := "systemctl stop bitcoinwalk-relay.service\n" +
-		"journal_digest_after=$(bolt_digest \"$source_journal\")\n" +
-		"systemctl start bitcoinwalk-relay.service"
-	if !strings.Contains(script, sequence) {
-		t.Fatal("live journal audit is not bounded by a stopped source writer")
+	if strings.Contains(script, "journal_digest_before") || strings.Contains(script, "journal_digest_after") {
+		t.Fatal("rehearsal compares a normally mutable live journal")
+	}
+	for _, required := range []string{"memphis-before.json", "nashville-before.json", "memphis-after.json", "nashville-after.json", "cmp \"$backup/memphis-before.json\" \"$backup/memphis-after.json\"", "cmp \"$backup/nashville-before.json\" \"$backup/nashville-after.json\""} {
+		if !strings.Contains(script, required) {
+			t.Fatalf("rehearsal omits public-state assertion %q", required)
+		}
 	}
 }
 
 func TestEntitlementRehearsalWaitsForSourceAfterFinalAudit(t *testing.T) {
-	data, err := os.ReadFile("deploy/rehearse-entitlement-provisioning-0.8.31.sh")
+	data, err := os.ReadFile("deploy/rehearse-entitlement-provisioning-0.8.32.sh")
 	if err != nil {
 		t.Fatal(err)
 	}
 	script := string(data)
-	sequence := "journal_digest_after=$(bolt_digest \"$source_journal\")\n" +
-		"systemctl start bitcoinwalk-relay.service\n" +
-		"wait_source_health"
-	if !strings.Contains(script, sequence) {
-		t.Fatal("final source restart does not use the bounded readiness wait")
+	if strings.Count(script, "wait_source_health") < 2 {
+		t.Fatal("source backup restart does not use the bounded readiness wait")
 	}
 }

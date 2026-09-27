@@ -7,8 +7,9 @@ test "$(id -u)" -eq 0 || { echo 'Run with sudo.' >&2; exit 1; }
 test "$#" -eq 0 || { echo "Usage: $0" >&2; exit 1; }
 cd "$(dirname "$0")/.."
 
-manifest=REPLICA-ENTITLEMENT-REHEARSAL-0.8.31-SHA256SUMS
-artifact=./bitcoinwalk-relay-replica-entitlement-0.8.31
+manifest=REPLICA-ENTITLEMENT-REHEARSAL-0.8.32-SHA256SUMS
+artifact=./bitcoinwalk-relay-replica-entitlement-0.8.32
+audit=./replica-audit-entitlement-0.8.32
 source_target=/opt/bitcoinwalk-relay/bitcoinwalk-relay
 source_db=/var/lib/bitcoinwalk-relay/events.db
 source_journal=/var/lib/bitcoinwalk-relay/replication-journal.db
@@ -18,11 +19,11 @@ base_city=73d20526-6bbf-4ed1-a98e-e7fd77de8179
 base_destination=wss://synthetic-baseline.invalid/
 city=8b6f3742-64b8-4d77-915a-a76b375fa06a
 destination=wss://synthetic-entitlement.invalid/
+nashville=586c0d1f-e861-4c8f-858c-ce3e2bfaf384
 port=3357
 accepted_source=b1b789170d02969ec72aac6e90a792219aa20b714e86dc93ce31187c5b5ee8ac
 
 digest(){ sha256sum "$1" | cut -d ' ' -f 1; }
-bolt_digest(){ RELAY_REPLICA_DB_DIGEST="$1" "$artifact"; }
 wait_health(){
  attempt=0
  until curl --fail --silent --max-time 2 "http://127.0.0.1:$port/healthz" >/dev/null;do
@@ -37,6 +38,7 @@ wait_source_health(){
 }
 
 sha256sum -c "$manifest"
+test -x "$audit"
 test "$(digest "$source_target")" = "$accepted_source"
 for file in "$source_db" "$source_journal" "$registry";do test -f "$file";done
 for unit in bitcoinwalk-guide bitcoinwalk-app-staging bitcoinwalk-relay bitcoinwalk-replica-rehearsal bitcoinwalk-replica-firstwalk caddy;do systemctl is-active --quiet "$unit";done
@@ -61,11 +63,15 @@ recover(){
  systemctl reset-failed bitcoinwalk-relay.service >/dev/null 2>&1||true
  systemctl start bitcoinwalk-relay.service >/dev/null 2>&1||true
  if [ "$completed" -ne 1 ];then
-  echo "Entitlement rehearsal did not complete; live registry and journal were not changed. Backup: $backup" >&2
+  echo "Entitlement rehearsal did not complete; no rehearsal registry or journal was installed live. Backup: $backup" >&2
  fi
  exit "$code"
 }
 trap recover EXIT HUP INT TERM
+
+"$audit" -source ws://127.0.0.1:3334 -replica ws://127.0.0.1:3341 >"$backup/memphis-before.json"
+"$audit" -source ws://127.0.0.1:3334 -city "$nashville" -replica ws://127.0.0.1:3342 -allow-empty >"$backup/nashville-before.json"
+echo 'Live Memphis and Nashville baselines captured.'
 
 systemctl stop bitcoinwalk-relay.service
 cp -p "$source_db" "$backup/source-events.db"
@@ -78,7 +84,6 @@ if [ -e "$authority_key" ];then cp -p "$authority_key" "$backup/preexisting-stag
  sha256sum source-events.db source-replication-journal.db live-registry.json live-source-binary >SHA256SUMS
  if [ -e preexisting-staging-authority-key ];then sha256sum preexisting-staging-authority-key >>SHA256SUMS;fi
 )
-journal_digest_before=$(bolt_digest "$backup/source-replication-journal.db")
 echo "Consistent pre-rehearsal backup created: $backup"
 systemctl start bitcoinwalk-relay.service
 wait_source_health
@@ -122,6 +127,7 @@ stop_isolated
 start_entitled "$isolated/entitlements.active.json" "$backup/active-start-2.log"
 wait_health
 stop_isolated
+echo 'Synthetic entitlement plan/apply and two restart checks passed.'
 
 sleep 1
 RELAY_REPLICA_ENTITLEMENT_STAGING_ISSUE_KEY="$authority_key" RELAY_REPLICA_ENTITLEMENT_STAGING_ISSUE_SOURCE="$isolated/entitlements.active.json" RELAY_REPLICA_ENTITLEMENT_STAGING_ISSUE_LEDGER="$isolated/entitlements.revoked.json" RELAY_REPLICA_ENTITLEMENT_STAGING_ISSUE_CITY="$city" RELAY_REPLICA_ENTITLEMENT_STAGING_ISSUE_STATUS=revoked RELAY_REPLICA_ENTITLEMENT_STAGING_ISSUE_CONFIRM=entitlement-staging-issue-v1 "$artifact" >"$backup/revoked-entitlement-result.json"
@@ -130,25 +136,26 @@ if env -i PATH=/usr/bin:/bin RELAY_LISTEN="127.0.0.1:$port" RELAY_DB="$isolated/
  echo 'Revoked synthetic entitlement unexpectedly started.' >&2;exit 1
 fi
 grep -q 'absent, revoked or superseded' "$backup/revoked-start.log"
+echo 'Synthetic revocation failed closed as required.'
 
 start_entitled "$isolated/entitlements.active.json" "$backup/active-start-after-rejection.log"
 wait_health
 stop_isolated
 
 test "$(digest "$registry")" = "$(digest "$backup/live-registry.json")"
-systemctl stop bitcoinwalk-relay.service
-journal_digest_after=$(bolt_digest "$source_journal")
-systemctl start bitcoinwalk-relay.service
-wait_source_health
-test "$journal_digest_after" = "$journal_digest_before"
 systemctl is-active --quiet bitcoinwalk-relay.service
+"$audit" -source ws://127.0.0.1:3334 -replica ws://127.0.0.1:3341 >"$backup/memphis-after.json"
+"$audit" -source ws://127.0.0.1:3334 -city "$nashville" -replica ws://127.0.0.1:3342 -allow-empty >"$backup/nashville-after.json"
+cmp "$backup/memphis-before.json" "$backup/memphis-after.json"
+cmp "$backup/nashville-before.json" "$backup/nashville-after.json"
+echo 'Live Memphis and Nashville public state remained exact.'
 (
  cd "$backup"
- sha256sum base-entitlement-result.json active-entitlement-result.json plan-result.json apply-result.json revoked-entitlement-result.json active-start-1.log active-start-2.log revoked-start.log active-start-after-rejection.log isolated/registry.base.json isolated/registry.candidate.json isolated/registry.active.json isolated/entitlements.base.json isolated/entitlements.active.json isolated/entitlements.revoked.json isolated/events.db isolated/journal.db >>SHA256SUMS
+ sha256sum memphis-before.json nashville-before.json memphis-after.json nashville-after.json base-entitlement-result.json active-entitlement-result.json plan-result.json apply-result.json revoked-entitlement-result.json active-start-1.log active-start-2.log revoked-start.log active-start-after-rejection.log isolated/registry.base.json isolated/registry.candidate.json isolated/registry.active.json isolated/entitlements.base.json isolated/entitlements.active.json isolated/entitlements.revoked.json isolated/events.db isolated/journal.db >>SHA256SUMS
 )
 completed=1
 trap - EXIT HUP INT TERM
 echo "Isolated synthetic entitlement provisioning accepted. Backup: $backup"
 echo "Staging entitlement authority public key: $authority"
 echo "Synthetic city: $city"
-echo 'Plan, apply, two accepted starts and one revoked fail-closed start passed; no live registry, journal, relay database, DNS or payment state changed.'
+echo 'Plan, apply, two accepted starts and one revoked fail-closed start passed; live public state remained exact and no rehearsal data entered live paths.'
