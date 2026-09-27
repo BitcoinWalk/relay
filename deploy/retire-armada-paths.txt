@@ -1,0 +1,12 @@
+/srv/bitcoinwalk-chat-staging/armada
+/srv/bitcoinwalk-chat-staging/armada-before-signer
+/opt/bitcoinwalk-signer-staging
+/etc/systemd/system/bitcoinwalk-signer-staging.service
+/home/bitcoinwalk/bitcoinwalk-chat-web-staging
+/home/bitcoinwalk/bitcoinwalk-chat-web-staging.tar.gz
+/home/bitcoinwalk/bitcoinwalk-signer-update
+/home/bitcoinwalk/bitcoinwalk-signer-update.tar.gz
+/home/bitcoinwalk/bitcoinwalk-login-test
+/home/bitcoinwalk/bitcoinwalk-login-test.tar.gz
+/home/bitcoinwalk/bitcoinwalk-login-links
+/home/bitcoinwalk/bitcoinwalk-login-links.tar.gz

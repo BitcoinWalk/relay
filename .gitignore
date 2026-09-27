@@ -1,0 +1,28 @@
+/bitcoinwalk-relay
+/data/
+/SHA256SUMS
+/bitcoinwalk-relay-organizers
+/ORGANIZERS-SHA256SUMS
+
+# Reproducible local and operator-package build outputs. Release binaries and
+# archives belong in signed release packages, not in source control.
+/bitcoinwalk-chat-credential-fix
+/bitcoinwalk-chat-production
+/bitcoinwalk-chat-staging
+/bitcoinwalk-relay-replica-*
+/replica-audit
+/replica-audit-*
+/app-staging-*.tar.gz
+/app-staging-*.tar.gz.sha256
+*.test
+coverage.out
+
+# Runtime state and local credentials.
+*.db
+*.sqlite
+.env
+.env.*
+*.key
+*.pem
+/credentials/
+/secrets/

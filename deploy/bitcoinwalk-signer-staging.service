@@ -1,0 +1,32 @@
+[Unit]
+Description=BitcoinWalk isolated ephemeral signing transport
+After=network.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+DynamicUser=yes
+ExecStart=/opt/bitcoinwalk-signer-staging/bitcoinwalk-signer
+Environment=RELAY_SIGNER_MODE=staging
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+MemoryMax=128M
+TasksMax=64
+LimitNOFILE=1024
+
+[Install]
+WantedBy=multi-user.target

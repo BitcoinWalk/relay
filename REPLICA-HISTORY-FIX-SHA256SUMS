@@ -1,0 +1,3 @@
+1e68a5ede895a0efdc7fcd54648ccaa55046ad0a943650e7f79bde948a072fc2  bitcoinwalk-relay-replica-rehearsal-0.8.16
+c3be1821669e06177e8138f0f6c7ac0793f3f23b57450075769e21ec130f2671  replica-audit
+6204e269eff3e4b87aae94e8a7adeada51de554ee0bc823c7085336adaefdcac  deploy/upgrade-replica-history-0.8.16.sh

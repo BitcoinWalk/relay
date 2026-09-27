@@ -1,0 +1,4 @@
+95fae26f9ff7cec5f40d63ea3a2dcf679178edae5e7ea7c87a9a1a19b13c09b3  bitcoinwalk-chat-staging
+772b4784ab73d513ed8291d25a928df639dbd8347d4ce2a05d7c77deb027069c  deploy/install-chat-private.sh
+a6057127170429815d38eaad342a272627b07726afd6bfa8faa5a3f6e185f28a  deploy/bitcoinwalk-chat-staging.service
+3e6a48dc2ccaaea773f2b7c61b7a1637ad26dc616066d0f85c9cc610d2c0832b  deploy/chat-staging.public.conf

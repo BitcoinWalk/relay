@@ -1,0 +1,42 @@
+[Unit]
+Description=BitcoinWalk Austin paid-city staging pilot
+After=network.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+DynamicUser=yes
+StateDirectory=bitcoinwalk-austin-staging
+StateDirectoryMode=0700
+WorkingDirectory=/var/lib/bitcoinwalk-austin-staging
+ExecStart=/opt/bitcoinwalk-austin-staging/bitcoinwalk-relay
+Environment=RELAY_CHAT_MODE=staging
+Environment=RELAY_CHAT_LISTEN=127.0.0.1:3337
+Environment=RELAY_CHAT_DB=/var/lib/bitcoinwalk-austin-staging/chat.db
+Environment=RELAY_CHAT_KEY_FILE=%d/relay-key
+# Required operator configuration: RELAY_CHAT_URL=wss://approved-staging-host
+EnvironmentFile=/etc/bitcoinwalk-austin-staging/public.conf
+LoadCredential=relay-key:/etc/bitcoinwalk-austin-staging/relay-key
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+MemoryMax=512M
+TasksMax=128
+
+[Install]
+WantedBy=multi-user.target

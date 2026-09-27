@@ -1,0 +1,41 @@
+[Unit]
+Description=BitcoinWalk isolated paid-city replication receiver rehearsal
+After=network.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+DynamicUser=yes
+StateDirectory=bitcoinwalk-replica-rehearsal
+StateDirectoryMode=0700
+WorkingDirectory=/var/lib/bitcoinwalk-replica-rehearsal
+ExecStart=/opt/bitcoinwalk-replica-rehearsal/bitcoinwalk-relay
+Environment=RELAY_LISTEN=127.0.0.1:3341
+Environment=RELAY_DB=/var/lib/bitcoinwalk-replica-rehearsal/events.db
+Environment=RELAY_ORGANIZER_MODE=true
+Environment="RELAY_NAME=BitcoinWalk paid-city replication rehearsal"
+Environment="RELAY_DESCRIPTION=Isolated staging receiver for authenticated public-event replication acceptance."
+EnvironmentFile=/etc/bitcoinwalk-replication/receiver.conf
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+MemoryMax=512M
+TasksMax=128
+
+[Install]
+WantedBy=multi-user.target

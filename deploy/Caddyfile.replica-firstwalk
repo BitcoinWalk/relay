@@ -1,0 +1,9 @@
+REPLICA_FIRSTWALK_HOST {
+	reverse_proxy 127.0.0.1:3342 {
+		# Bind Khatru's NIP-42 relay URL to the public TLS endpoint.
+		header_up X-Forwarded-For {http.request.remote.host}
+		header_up X-Forwarded-Host REPLICA_FIRSTWALK_HOST
+		header_up X-Forwarded-Proto https
+		header_up -Forwarded
+	}
+}

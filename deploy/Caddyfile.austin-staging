@@ -1,0 +1,15 @@
+# Isolated paid-city pilot; no hosted Armada or signing transport.
+austin-staging.bitcoinwalk.org {
+	@pending path /join-chat /join-chat/
+	handle @pending {
+		respond "Austin pilot chat is being provisioned. No invite is active yet." 503
+	}
+	handle {
+		reverse_proxy 127.0.0.1:3337 {
+			header_up X-Forwarded-For {http.request.remote.host}
+			header_up X-Forwarded-Host austin-staging.bitcoinwalk.org
+			header_up X-Forwarded-Proto https
+			header_up -Forwarded
+		}
+	}
+}

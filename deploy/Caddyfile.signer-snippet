@@ -1,0 +1,9 @@
+	@signer path /signer /signer/
+	handle @signer {
+		reverse_proxy 127.0.0.1:3336 {
+			header_up X-Forwarded-For {http.request.remote.host}
+			header_up X-Forwarded-Host chat-staging.bitcoinwalk.org
+			header_up X-Forwarded-Proto https
+			header_up -Forwarded
+		}
+	}

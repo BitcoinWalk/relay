@@ -1,0 +1,4 @@
+636b0c6781dc3fbc221fb6f5649f25d1d4ba330d2123aecc06af710f78e60ab6  bitcoinwalk-relay-replica-rehearsal-0.8.22
+f31ecd51e38815616d7d202c6c4ac2ed7f4ffead0c25cec7f74b64c0cfb7208f  app-staging-0.3.60.tar.gz
+841b08862d2b6d18b83c7682fb5b24d925273a11d87385cb960a4473fb47d2b8  app-staging-0.3.60.tar.gz.sha256
+26f9c216c825545064d772b6b68300fe10a3af0201aba292b93466ef50960eae  deploy/install-replication-alerts-0.8.22.sh

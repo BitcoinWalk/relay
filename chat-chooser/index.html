@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Join {{.Title}}</title><link rel="stylesheet" href="/chat-chooser/style.css"><script src="/chat-chooser/chooser.js" defer></script></head>
+<body><main>
+<a class="brand" href="https://bitcoinwalk.org">BITCOIN<span>WALK</span></a>
+<p class="eyebrow">WALK TOGETHER. STAY CONNECTED.</p>
+<h1>{{.Title}}</h1>
+<p class="intro">Meet the people behind the walks. Choose how you’d like to open the chat.</p>
+<div class="privacy"><span aria-hidden="true">✓</span><p>Anyone can join. Only joined members can read messages. Moderators can remove spammers.</p></div>
+{{if .Local}}<aside><strong>Local test preview</strong><p>This chat runs on your computer. A phone or installed mobile app cannot reach it through localhost. Use test content only.</p></aside>{{end}}
+<section aria-label="Ways to open chat">
+<div class="option"><div><h2>Armada app <span class="badge">MOBILE</span></h2><p>Use the app’s supported signer to connect with your Nostr identity.</p></div><button disabled aria-describedby="app-status">Open in Armada <span aria-hidden="true">↗</span></button><p id="app-status" class="hint">{{if .Local}}Available after we deploy a public test relay and verify mobile app opening.{{else}}Mobile app opening is awaiting device verification. Please use the browser option.{{end}}</p></div>
+<div class="option"><div><h2>Your browser <span id="preferred" class="badge" hidden>PREFERRED</span></h2><p>No installation needed. Sign in, then choose Join.</p></div><a class="button primary" id="browser-link" href="{{.BrowserURL}}">Continue in browser <span aria-hidden="true">→</span></a><p class="hint">On desktop, use your Nostr browser extension. Mobile browser signer support is still being tested.</p></div>
+</section>
+<label class="remember"><input id="remember" type="checkbox"> Remember my browser preference on this device</label><p id="preference-status" class="hint" role="status" aria-live="polite"></p>
+<p class="install">Don’t have the app? <a href="https://soapbox.pub/armada" target="_blank" rel="noopener noreferrer">Get Armada <span aria-hidden="true">↗</span></a></p>
+<footer>Keep your keys with your signer. BitcoinWalk will never ask you to paste your private key here. Members-only access is not end-to-end encryption.</footer>
+</main></body></html>

@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Austin membership check</title>
+<style>body{font:17px system-ui;max-width:48rem;margin:3rem auto;padding:1rem}button{padding:1rem;font:inherit}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#eee;padding:1rem}</style>
+<h1>Austin membership check</h1>
+<p>Select the regular identity from your event reference in SideCar. The membership check is read-only and signs relay authentication only.</p>
+<button id="check">Check my Austin membership</button>
+<p>The separate join test signs and publishes ONE kind-9021 request to join Austin channel d8006bee1ddd5b5f. It changes your membership if accepted. It sends no chat messages, never retries automatically, and does not touch global chat.</p>
+<button id="join">Join Austin directly and check result</button><pre id="output" role="status">Ready.</pre>
+<script>
+const expected='4506e04e4b7079ce07e38e9875678a81ad33a456c696d708ef8e9a2d8c16ba04';
+const relay='wss://austin-staging.bitcoinwalk.org', group='d8006bee1ddd5b5f';
+const output=document.getElementById('output'),button=document.getElementById('check');
+const joinButton=document.getElementById('join');
+const log=value=>{output.textContent+='\n'+value;};
+async function run(join){
+ button.disabled=true;joinButton.disabled=true;output.textContent='Checking signer identity…';
+ let ws,timer,done=false;const records=[];let authId,joinId,authStarted=false,queried=false;
+ const finish=()=>{done=true;clearTimeout(timer);if(ws)ws.close();button.disabled=false;joinButton.disabled=false;};
+ try{
+  if(!window.nostr)throw Error('No Nostr extension available. Open this page in your SideCar-enabled browser.');
+  const key=await window.nostr.getPublicKey();
+  log('Signer public key: '+key);
+  if(key!==expected)throw Error('Identity mismatch: select the regular account used for the supplied nevent. No relay request sent.');
+  const readMembership=()=>{log('Reading your channel membership…');ws.send(JSON.stringify(['REQ','membership',{kinds:[9000,9001],'#h':[group],'#p':[key],limit:10}]));};
+  ws=new WebSocket(relay);
+  timer=setTimeout(()=>{log('Timed out. No membership conclusion.');finish();},90000);
+  ws.onerror=()=>{log('WebSocket connection error.');finish();};
+  ws.onclose=()=>{if(!done){log('Connection closed before the check completed.');finish();}};
+  ws.onopen=()=>{log('Connected. Waiting for authentication challenge…');ws.send(JSON.stringify(['REQ','trigger',{kinds:[9000,9001],'#h':[group],'#p':[key],limit:10}]));};
+  ws.onmessage=async({data})=>{
+   try{
+    if(done)return;
+    const m=JSON.parse(data);
+    if(m[0]==='AUTH'&&!authStarted){
+     authStarted=true;log('Approve the relay-authentication request in SideCar.');
+     const signed=await window.nostr.signEvent({kind:22242,created_at:Math.floor(Date.now()/1000),tags:[['relay',relay],['challenge',m[1]]],content:''});
+     if(done)return;
+     if(signed.pubkey!==key)throw Error('Signer returned a different account for authentication.');
+     if(signed.kind!==22242||signed.content!==''||JSON.stringify(signed.tags)!==JSON.stringify([['relay',relay],['challenge',m[1]]]))throw Error('Unexpected authentication payload returned by signer.');
+     authId=signed.id;ws.send(JSON.stringify(['AUTH',signed]));
+    }
+    if(m[0]==='OK'&&m[1]===authId){
+     if(!m[2])throw Error('Authentication rejected: '+m[3]);
+     if(queried)return;queried=true;log('Authentication accepted.');
+     ws.send(JSON.stringify(['CLOSE','trigger']));
+     if(!join){readMembership();return;}
+     log('Approve one Austin JOIN request (kind 9021) in SideCar.');
+     const template={kind:9021,created_at:Math.floor(Date.now()/1000),tags:[['h',group],['client','BitcoinWalk diagnostic']],content:''};
+     const signed=await window.nostr.signEvent(template);
+     if(done)return;
+     if(signed.pubkey!==key||signed.kind!==template.kind||signed.created_at!==template.created_at||signed.content!==''||JSON.stringify(signed.tags)!==JSON.stringify(template.tags))throw Error('Signer returned a different identity or join payload. Nothing published.');
+     joinId=signed.id;log('Publishing join event: '+joinId);ws.send(JSON.stringify(['EVENT',signed]));
+    }
+    if(m[0]==='OK'&&joinId&&m[1]===joinId){
+     log('JOIN ACK: '+JSON.stringify(m));
+     readMembership();
+    }
+    if(m[0]==='EVENT'&&m[1]==='membership')records.push(m[2]);
+    if(m[0]==='CLOSED'&&m[1]==='membership')throw Error('Membership query rejected: '+m[2]);
+    if(m[0]==='EOSE'&&m[1]==='membership'){
+     if(!records.length)log('RESULT: Relay returned no membership record for this identity in the Austin chat. This does not identify where the join attempt stopped.');
+     else{
+      records.sort((a,b)=>b.created_at-a.created_at||a.id.localeCompare(b.id));
+      log('RESULT: Relay returned '+records.length+' membership record(s). Newest kind: '+records[0].kind+' (9000=added, 9001=removed).');
+      log(JSON.stringify(records.map(e=>({id:e.id,pubkey:e.pubkey,kind:e.kind,created_at:e.created_at,tags:e.tags})),null,2));
+     }
+     finish();
+    }
+   }catch(e){log('STOP: '+e.message);finish();}
+  };
+ }catch(e){log('STOP: '+e.message);finish();}
+};
+button.onclick=()=>run(false);
+joinButton.onclick=()=>run(true);
+</script></html>

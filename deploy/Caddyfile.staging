@@ -1,0 +1,12 @@
+# Prepared only; not installed. Confirm DNS and review firewall before activation.
+# Serve this hostname only. Do not add the apex, www, or wildcard hostnames.
+relay-staging.bitcoinwalk.org {
+	reverse_proxy 127.0.0.1:3334 {
+		# This Caddy instance is the public edge, not behind another proxy.
+		# Do not allow clients to spoof the address used by relay rate limits.
+		header_up X-Forwarded-For {http.request.remote.host}
+		header_up X-Forwarded-Host relay-staging.bitcoinwalk.org
+		header_up X-Forwarded-Proto https
+		header_up -Forwarded
+	}
+}

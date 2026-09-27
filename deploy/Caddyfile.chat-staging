@@ -1,0 +1,37 @@
+# Prepared site block only. Do not replace the existing Caddyfile with this file.
+# Append/import after installer backup, review, validation and staging gates.
+# Requires the pinned Armada PUBLIC build in /srv/bitcoinwalk-chat-staging/armada
+# and the persistent chat service on loopback port 3335.
+chat-staging.bitcoinwalk.org {
+	@relay {
+		header Upgrade websocket
+	}
+	handle @relay {
+		reverse_proxy 127.0.0.1:3335 {
+			header_up X-Forwarded-For {http.request.remote.host}
+			header_up X-Forwarded-Host chat-staging.bitcoinwalk.org
+			header_up X-Forwarded-Proto https
+			header_up -Forwarded
+		}
+	}
+	@info {
+		header Accept *application/nostr+json*
+	}
+	handle @info {
+		reverse_proxy 127.0.0.1:3335
+	}
+	handle /healthz {
+		reverse_proxy 127.0.0.1:3335
+	}
+	# Chooser route is enabled only after the admin-created group is verified.
+	handle /join-chat {
+		respond "Chat staging is being prepared. Joining is not enabled yet." 503
+	}
+	handle {
+		root * /srv/bitcoinwalk-chat-staging/armada
+		header Referrer-Policy no-referrer
+		header X-Content-Type-Options nosniff
+		try_files {path} /index.html
+		file_server
+	}
+}

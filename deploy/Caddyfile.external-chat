@@ -1,0 +1,50 @@
+# BitcoinWalk hosts the relay and join page, not the Armada application.
+chat-staging.bitcoinwalk.org {
+	route {
+		@retired path /signer /signer/*
+		handle @retired {
+			respond "Signing transport retired. Use Armada's own signer login." 410
+		}
+		@relay {
+			path /
+			header Upgrade websocket
+		}
+		handle @relay {
+			reverse_proxy 127.0.0.1:3335 {
+				header_up X-Forwarded-For {http.request.remote.host}
+				header_up X-Forwarded-Host chat-staging.bitcoinwalk.org
+				header_up X-Forwarded-Proto https
+				header_up -Forwarded
+			}
+		}
+		@info {
+			path /
+			header Accept *application/nostr+json*
+		}
+		handle @info {
+			reverse_proxy 127.0.0.1:3335
+		}
+		handle /healthz {
+			reverse_proxy 127.0.0.1:3335
+		}
+		handle /join-chat {
+			root * /srv/bitcoinwalk-chat-staging/join-site
+			header Referrer-Policy no-referrer
+			header X-Content-Type-Options nosniff
+			header Cache-Control no-store
+			header Content-Security-Policy "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+			rewrite * /index.html
+			file_server
+		}
+		@entry path / /welcome /login-test.html /join-chat/
+		handle @entry {
+			redir * /join-chat 302
+		}
+		handle /s/* {
+			redir https://armada.buzz{uri} 302
+		}
+		handle {
+			respond "Not found. Open /join-chat to access BitcoinWalk on Armada." 404
+		}
+	}
+}
