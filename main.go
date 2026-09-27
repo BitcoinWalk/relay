@@ -43,6 +43,18 @@ func parseWriters(value string) (map[nostr.PubKey]bool, error) {
 	return writers, nil
 }
 
+func validateListenAddress(listen string, allowDirectoryContainer bool) error {
+	host, _, err := net.SplitHostPort(listen)
+	if err != nil {
+		return errors.New("RELAY_LISTEN must use a loopback IP; public access requires a TLS reverse proxy")
+	}
+	ip := net.ParseIP(host)
+	if ip != nil && (ip.IsLoopback() || allowDirectoryContainer && ip.Equal(net.IPv4zero)) {
+		return nil
+	}
+	return errors.New("RELAY_LISTEN must use a loopback IP; public access requires a TLS reverse proxy")
+}
+
 func writePolicy(writers map[nostr.PubKey]bool) func(context.Context, nostr.Event) (bool, string) {
 	return func(ctx context.Context, event nostr.Event) (bool, string) {
 		if !writers[event.PubKey] {
@@ -166,10 +178,17 @@ func run() error {
 	if reconciliationAudit == "true" && (env("RELAY_ORGANIZER_MODE", "false") != "true" || os.Getenv("RELAY_REPLICA_JOURNAL") == "" || os.Getenv("RELAY_REPLICA_REGISTRY") == "") {
 		return errors.New("replica reconciliation audit requires organizer mode, journal and registry")
 	}
+	directoryTransportMode := env("RELAY_CITY_DIRECTORY_TRANSPORT", "")
+	containerListen := env("RELAY_CITY_DIRECTORY_CONTAINER_LISTEN", "false")
+	if containerListen != "false" && containerListen != "true" {
+		return errors.New("RELAY_CITY_DIRECTORY_CONTAINER_LISTEN must be true or false")
+	}
+	if containerListen == "true" && directoryTransportMode == "" {
+		return errors.New("container listen is restricted to the city directory transport")
+	}
 	listen := env("RELAY_LISTEN", "127.0.0.1:3334")
-	host, _, err := net.SplitHostPort(listen)
-	if err != nil || net.ParseIP(host) == nil || !net.ParseIP(host).IsLoopback() {
-		return fmt.Errorf("RELAY_LISTEN must use a loopback IP; public access requires a TLS reverse proxy")
+	if err := validateListenAddress(listen, containerListen == "true"); err != nil {
+		return err
 	}
 	writers, err := parseWriters(env("RELAY_WRITERS", adminHex))
 	if err != nil {
@@ -181,7 +200,6 @@ func run() error {
 	}
 	defer db.Close()
 	defer relay.DisableExpirationManager()
-	directoryTransportMode := env("RELAY_CITY_DIRECTORY_TRANSPORT", "")
 	if directoryTransportMode != "" {
 		if env("RELAY_ORGANIZER_MODE", "false") != "false" {
 			return errors.New("city directory transport cannot enable organizer mode")

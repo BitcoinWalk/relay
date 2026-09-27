@@ -51,6 +51,32 @@ func TestWriterPolicy(t *testing.T) {
 	}
 }
 
+func TestListenAddressRequiresExplicitDirectoryContainerMode(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		listen    string
+		container bool
+		accepted  bool
+	}{
+		{"host loopback", "127.0.0.1:3343", false, true},
+		{"generic wildcard", "0.0.0.0:3343", false, false},
+		{"directory container wildcard", "0.0.0.0:3343", true, true},
+		{"container IPv6 wildcard", "[::]:3343", true, false},
+		{"hostname", "localhost:3343", true, false},
+		{"malformed", "3343", true, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			err := validateListenAddress(test.listen, test.container)
+			if test.accepted && err != nil {
+				t.Fatal(err)
+			}
+			if !test.accepted && err == nil {
+				t.Fatal("unsafe listen address accepted")
+			}
+		})
+	}
+}
+
 func TestWebSocketAuthPublicReadAndPersistence(t *testing.T) {
 	sk := nostr.Generate()
 	pk := nostr.GetPublicKey(sk)

@@ -27,3 +27,10 @@ jobs:
           CGO_ENABLED=0 go build -buildvcs=false -trimpath -ldflags='-s -w' -o /tmp/bitcoinwalk-relay .
           CGO_ENABLED=0 go build -buildvcs=false -trimpath -ldflags='-s -w' -o /tmp/replica-audit ./cmd/replica-audit
           CGO_ENABLED=0 go build -buildvcs=false -trimpath -ldflags='-s -w' -o /tmp/nip29-audit ./cmd/nip29-audit
+      - name: Upload static relay
+        uses: actions/upload-artifact@v4
+        with:
+          name: bitcoinwalk-relay-linux-amd64
+          path: /tmp/bitcoinwalk-relay
+          if-no-files-found: error
+          retention-days: 7

@@ -7,7 +7,7 @@ import (
 )
 
 func TestSecondaryDirectoryDockerDeploymentIsIsolatedAndBackupFirst(t *testing.T) {
-	compose, err := os.ReadFile("deploy/compose.directory-2-staging.yaml")
+	compose, err := os.ReadFile("deploy/compose.directory-2-staging-0.8.38.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -22,6 +22,7 @@ func TestSecondaryDirectoryDockerDeploymentIsIsolatedAndBackupFirst(t *testing.T
 		"cap_drop:",
 		"no-new-privileges:true",
 		"127.0.0.1:3343:3343",
+		"RELAY_CITY_DIRECTORY_CONTAINER_LISTEN: \"true\"",
 		"/var/lib/bitcoinwalk-directory-2-staging:/data",
 		"name: root_my_custom_network",
 	} {
@@ -36,5 +37,14 @@ func TestSecondaryDirectoryDockerDeploymentIsIsolatedAndBackupFirst(t *testing.T
 	}
 	if !strings.Contains(string(dockerfile), "FROM scratch") || !strings.Contains(string(dockerfile), "USER 65532:65532") {
 		t.Fatal("secondary directory image is not scratch-based and non-root")
+	}
+	installer, err := os.ReadFile("deploy/install-directory-2-docker-0.8.38.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, required := range []string{"docker logs \"$container\"", "container-inspect.failure.json", "container.log"} {
+		if !strings.Contains(string(installer), required) {
+			t.Fatalf("corrected installer does not retain failure evidence %q", required)
+		}
 	}
 }
