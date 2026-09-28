@@ -431,22 +431,28 @@ func (p *organizerPolicy) check(ctx context.Context, event nostr.Event) error {
 func enableOrganizers(relay *khatru.Relay, db *boltdb.BoltBackend, admin nostr.PubKey) *organizerPolicy {
 	p := &organizerPolicy{db: db, admin: admin, limits: &chatLimits{}}
 	relay.OnEvent = policies.SeqEvent(func(ctx context.Context, event nostr.Event) (bool, string) {
-		now := time.Now()
-		if !p.limits.allow("organizer-write:"+event.PubKey.Hex(), 120, time.Hour, now) {
-			return true, "rate-limited: organizer write limit"
-		}
-		if value, ok := exactCalendarTag(event, "bitcoinwalk"); ok && value == "initial-proposal-v1" {
-			if !p.limits.allow("initial-walk:"+event.PubKey.Hex(), 3, 24*time.Hour, now) {
-				return true, "rate-limited: initial walk submission limit"
-			}
-			if ip := khatru.GetIP(ctx); ip != "" && !p.limits.allow("initial-walk-ip:"+ip, 30, 24*time.Hour, now) {
-				return true, "rate-limited: initial walk network limit"
-			}
-		}
 		p.mu.Lock()
 		defer p.mu.Unlock()
 		if err := p.check(ctx, event); err != nil {
 			return true, err.Error()
+		}
+		// Authentication challenges and invalid events must not consume the small
+		// new-city budget. Browser clients normally publish once before NIP-42
+		// authentication and then retransmit the same signed event. Exact stored
+		// retransmissions are idempotent and must not consume another slot either.
+		if p.byID(event.ID.Hex()) == nil {
+			now := time.Now()
+			if !p.limits.allow("organizer-write:"+event.PubKey.Hex(), 120, time.Hour, now) {
+				return true, "rate-limited: organizer write limit"
+			}
+			if value, ok := exactCalendarTag(event, "bitcoinwalk"); ok && value == "initial-proposal-v1" {
+				if !p.limits.allow("initial-walk:"+event.PubKey.Hex(), 3, 24*time.Hour, now) {
+					return true, "rate-limited: initial walk submission limit"
+				}
+				if ip := khatru.GetIP(ctx); ip != "" && !p.limits.allow("initial-walk-ip:"+ip, 30, 24*time.Hour, now) {
+					return true, "rate-limited: initial walk network limit"
+				}
+			}
 		}
 		return false, ""
 	}, policies.EventRejectionStrictDefaults)
@@ -479,6 +485,6 @@ func enableOrganizers(relay *khatru.Relay, db *boltdb.BoltBackend, admin nostr.P
 	// stopping publication; the calendar guards suppress deleted IDs permanently.
 	relay.DeleteEvent = nil
 	relay.Info.Description = env("RELAY_DESCRIPTION", "BitcoinWalk staging: authenticated organizer proposals, admin-managed city editors, public reads.")
-	relay.Info.Version = env("RELAY_VERSION", "bitcoinwalk-organizers-0.8.23")
+	relay.Info.Version = env("RELAY_VERSION", "bitcoinwalk-organizers-0.8.24")
 	return p
 }
