@@ -110,6 +110,9 @@ func newRelay(dbPath string, writers map[nostr.PubKey]bool) (*khatru.Relay, *bol
 }
 
 func run() error {
+	if os.Getenv("RELAY_CITY_DIRECTORY_SUCCESSOR_REHEARSAL") != "" {
+		return runCityDirectorySuccessorRehearsal()
+	}
 	if cityDirectoryAuditConfigured() {
 		return runCityDirectoryAudit()
 	}
