@@ -63,6 +63,22 @@ class ReplicaCandidateTmpfsTests(unittest.TestCase):
         self.assertIn('report["source"]["occurrenceIds"]', installer)
         self.assertIn('restored candidate is not empty', installer)
 
+    def test_visible_state_reset_is_backup_first_and_preserves_hardening(self):
+        installer = (DEPLOY / "reset-replica-candidate-visible-0.8.49.sh").read_text()
+        backup = installer.index('cp -p "$state" "$backup/events.divergent.db"')
+        restore = installer.index('install -o 65532 -g 65532 -m 0600 "$restore/events.db" "$state"')
+        self.assertLess(backup, restore)
+        self.assertIn('ReadonlyRootfs', installer)
+        self.assertIn('PortBindings', installer)
+        self.assertIn('reset candidate is not empty', installer)
+
+    def test_visible_backfill_uses_exact_accepted_public_snapshot(self):
+        installer = (DEPLOY / "backfill-replica-candidate-visible-0.8.49.sh").read_text()
+        self.assertIn('>"$backup/public-baseline.json"', installer)
+        self.assertIn('RELAY_REPLICA_SHADOW_PUBLIC_SNAPSHOT="$backup/public-baseline.json"', installer)
+        self.assertIn("grep -q '\"delivered\":7'", installer)
+        self.assertNotIn("grep -q '\"delivered\":8'", installer)
+
 
 if __name__ == "__main__":
     unittest.main()

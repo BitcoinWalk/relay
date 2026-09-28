@@ -24,6 +24,48 @@ type replicaShadowBackfillResult struct {
 	JournalMode          string `json:"journalMode"`
 }
 
+type replicaPublicSnapshot struct {
+	CityID   string `json:"cityId"`
+	ReadOnly bool   `json:"readOnly"`
+	Source   struct {
+		OccurrenceIDs       []string `json:"occurrenceIds"`
+		AllSignaturesValid  bool     `json:"allSignaturesValid"`
+		PrivateWrapperCount int      `json:"privateWrapperCount"`
+	} `json:"source"`
+	Replica struct {
+		OccurrenceIDs       []string `json:"occurrenceIds"`
+		AllSignaturesValid  bool     `json:"allSignaturesValid"`
+		PrivateWrapperCount int      `json:"privateWrapperCount"`
+	} `json:"replica"`
+	ExactEventIDs bool `json:"exactEventIds"`
+}
+
+func loadReplicaPublicSnapshot(path, cityID string) ([]string, error) {
+	info, err := os.Lstat(path)
+	if err != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 || info.Mode().Perm()&0022 != 0 {
+		return nil, errors.New("replica shadow public snapshot must be a non-writable regular file")
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var snapshot replicaPublicSnapshot
+	if json.Unmarshal(data, &snapshot) != nil || snapshot.CityID != cityID || !snapshot.ReadOnly || !snapshot.ExactEventIDs || !snapshot.Source.AllSignaturesValid || !snapshot.Replica.AllSignaturesValid || snapshot.Source.PrivateWrapperCount != 0 || snapshot.Replica.PrivateWrapperCount != 0 || len(snapshot.Source.OccurrenceIDs) == 0 || !slices.Equal(snapshot.Source.OccurrenceIDs, snapshot.Replica.OccurrenceIDs) {
+		return nil, errors.New("replica shadow public snapshot is not an exact accepted baseline")
+	}
+	seen := make(map[string]struct{}, len(snapshot.Source.OccurrenceIDs))
+	for _, eventID := range snapshot.Source.OccurrenceIDs {
+		if len(eventID) != 64 {
+			return nil, errors.New("replica shadow public snapshot contains an invalid event ID")
+		}
+		if _, duplicate := seen[eventID]; duplicate {
+			return nil, errors.New("replica shadow public snapshot contains duplicate event IDs")
+		}
+		seen[eventID] = struct{}{}
+	}
+	return snapshot.Source.OccurrenceIDs, nil
+}
+
 func validateAcknowledgedReplicaRow(row *replicaOutboxRow, eventID string) error {
 	if row == nil || row.EventID != eventID || row.Status != "acknowledged" || row.Envelope == nil || row.Control != nil {
 		return errors.New("replica operation requires an acknowledged, unsuppressed occurrence")
@@ -79,7 +121,7 @@ func loadAcknowledgedReplicaEnvelope(path, eventID string) (*replicaDeliveryEnve
 	return &copy, nil
 }
 
-func loadReplicaShadowEnvelopes(path, cityID, sourceDestination, candidateDestination string) ([]replicaDeliveryEnvelope, error) {
+func loadReplicaShadowEnvelopes(path, cityID, sourceDestination, candidateDestination string, publicIDs []string) ([]replicaDeliveryEnvelope, error) {
 	if path == "" || !uuidPattern.MatchString(cityID) {
 		return nil, errors.New("replica shadow backfill requires a journal and valid city")
 	}
@@ -97,7 +139,20 @@ func loadReplicaShadowEnvelopes(path, cityID, sourceDestination, candidateDestin
 		return nil, fmt.Errorf("open replica shadow journal read-only: %w", err)
 	}
 	defer db.Close()
-	envelopes := make([]replicaDeliveryEnvelope, 0)
+	if len(publicIDs) == 0 {
+		return nil, errors.New("replica shadow backfill requires an exact non-empty public snapshot")
+	}
+	public := make(map[string]struct{}, len(publicIDs))
+	for _, eventID := range publicIDs {
+		if len(eventID) != 64 {
+			return nil, errors.New("replica shadow public event ID is invalid")
+		}
+		if _, duplicate := public[eventID]; duplicate {
+			return nil, errors.New("replica shadow public event IDs are not unique")
+		}
+		public[eventID] = struct{}{}
+	}
+	envelopes := make([]replicaDeliveryEnvelope, 0, len(publicIDs))
 	err = db.View(func(tx *bbolt.Tx) error {
 		bucket := tx.Bucket(replicaOutboxBucket)
 		if bucket == nil {
@@ -119,6 +174,9 @@ func loadReplicaShadowEnvelopes(path, cityID, sourceDestination, candidateDestin
 				if err := validateAcknowledgedReplicaRow(&row, row.EventID); err != nil {
 					return err
 				}
+				if _, visible := public[row.EventID]; !visible {
+					return nil
+				}
 				envelope := *row.Envelope
 				envelope.Bundle = append(json.RawMessage(nil), row.Envelope.Bundle...)
 				envelope.Destination = candidate
@@ -134,8 +192,8 @@ func loadReplicaShadowEnvelopes(path, cityID, sourceDestination, candidateDestin
 	if err != nil {
 		return nil, err
 	}
-	if len(envelopes) == 0 {
-		return nil, errors.New("replica shadow source has no acknowledged occurrences")
+	if len(envelopes) != len(public) {
+		return nil, errors.New("replica shadow journal does not contain every exact public occurrence")
 	}
 	slices.SortFunc(envelopes, func(a, b replicaDeliveryEnvelope) int {
 		if a.SourceSequence < b.SourceSequence {
@@ -154,12 +212,12 @@ func loadReplicaShadowEnvelopes(path, cityID, sourceDestination, candidateDestin
 	return envelopes, nil
 }
 
-func shadowBackfillReplica(ctx context.Context, journalPath, keyPath, cityID, sourceDestination, candidateDestination, confirmation string, transport replicaTransport) (replicaShadowBackfillResult, error) {
+func shadowBackfillReplica(ctx context.Context, journalPath, keyPath, cityID, sourceDestination, candidateDestination string, publicIDs []string, confirmation string, transport replicaTransport) (replicaShadowBackfillResult, error) {
 	result := replicaShadowBackfillResult{CityID: cityID, SourceDestination: sourceDestination, CandidateDestination: candidateDestination, JournalMode: "read-only"}
 	if confirmation != replicaShadowBackfillConfirmation {
 		return result, errors.New("replica shadow backfill requires the exact production-candidate confirmation")
 	}
-	envelopes, err := loadReplicaShadowEnvelopes(journalPath, cityID, sourceDestination, candidateDestination)
+	envelopes, err := loadReplicaShadowEnvelopes(journalPath, cityID, sourceDestination, candidateDestination, publicIDs)
 	if err != nil {
 		return result, err
 	}
@@ -184,13 +242,19 @@ func shadowBackfillReplica(ctx context.Context, journalPath, keyPath, cityID, so
 }
 
 func runReplicaShadowBackfill() error {
+	cityID := os.Getenv("RELAY_REPLICA_SHADOW_CITY")
+	publicIDs, err := loadReplicaPublicSnapshot(os.Getenv("RELAY_REPLICA_SHADOW_PUBLIC_SNAPSHOT"), cityID)
+	if err != nil {
+		return err
+	}
 	result, err := shadowBackfillReplica(
 		context.Background(),
 		os.Getenv("RELAY_REPLICA_JOURNAL"),
 		os.Getenv("RELAY_REPLICA_DELIVERY_KEY_FILE"),
-		os.Getenv("RELAY_REPLICA_SHADOW_CITY"),
+		cityID,
 		os.Getenv("RELAY_REPLICA_SHADOW_SOURCE"),
 		os.Getenv("RELAY_REPLICA_SHADOW_CANDIDATE"),
+		publicIDs,
 		os.Getenv("RELAY_REPLICA_SHADOW_CONFIRM"),
 		nil,
 	)

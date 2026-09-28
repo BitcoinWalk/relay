@@ -137,6 +137,12 @@ func TestReplicaShadowBackfillIsReadOnlyOrderedAndExcludesSuppressedRows(t *test
 	suppressed.OccurrenceID = suppressed.Event.ID.Hex()
 	suppressed.SourceSequence = 5
 	putReplayRow(t, db, replicaOutboxRow{EventID: suppressed.OccurrenceID, CityID: cityA, Destination: suppressed.Destination, SourceSequence: 9, Status: "canceled", Attempts: 2, Envelope: &suppressed})
+	historical := later
+	historical.Event = nostr.Event{Kind: 31923, Content: "historical acknowledged occurrence", Tags: nostr.Tags{{"i", cityA}, {"bitcoinwalk", "occurrence-v1"}}}
+	historical.Event.Sign(nostr.Generate())
+	historical.OccurrenceID = historical.Event.ID.Hex()
+	historical.SourceSequence = 6
+	putReplayRow(t, db, replicaOutboxRow{EventID: historical.OccurrenceID, CityID: cityA, Destination: historical.Destination, SourceSequence: historical.SourceSequence, Status: "acknowledged", Attempts: 1, Envelope: &historical})
 	if err := db.Close(); err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +159,7 @@ func TestReplicaShadowBackfillIsReadOnlyOrderedAndExcludesSuppressedRows(t *test
 		delivered = append(delivered, envelope)
 		return replicaDeliveryAck{EventID: envelope.OccurrenceID, SourceSequence: envelope.SourceSequence, Accepted: true}, nil
 	}
-	result, err := shadowBackfillReplica(t.Context(), path, "", cityA, later.Destination, target, replicaShadowBackfillConfirmation, transport)
+	result, err := shadowBackfillReplica(t.Context(), path, "", cityA, later.Destination, target, []string{earlier.OccurrenceID, later.OccurrenceID}, replicaShadowBackfillConfirmation, transport)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -193,10 +199,37 @@ func TestReplicaShadowBackfillFailsClosedBeforeDelivery(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			called = false
-			if _, err := shadowBackfillReplica(t.Context(), path, "", test.city, test.source, test.candidate, test.confirmation, transport); err == nil || called {
+			if _, err := shadowBackfillReplica(t.Context(), path, "", test.city, test.source, test.candidate, []string{envelope.OccurrenceID}, test.confirmation, transport); err == nil || called {
 				t.Fatal("unsafe shadow backfill reached the transport")
 			}
 		})
+	}
+	if _, err := shadowBackfillReplica(t.Context(), path, "", cityA, envelope.Destination, "wss://candidate.example/", []string{"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"}, replicaShadowBackfillConfirmation, transport); err == nil || called {
+		t.Fatal("shadow backfill delivered without an acknowledged envelope for every public event")
+	}
+}
+
+func TestReplicaShadowPublicSnapshotRequiresExactAcceptedState(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "snapshot.json")
+	document := `{"cityId":"` + cityA + `","readOnly":true,"source":{"occurrenceIds":["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],"allSignaturesValid":true,"privateWrapperCount":0},"replica":{"occurrenceIds":["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],"allSignaturesValid":true,"privateWrapperCount":0},"exactEventIds":true}`
+	if err := os.WriteFile(path, []byte(document), 0400); err != nil {
+		t.Fatal(err)
+	}
+	ids, err := loadReplicaPublicSnapshot(path, cityA)
+	if err != nil || len(ids) != 1 {
+		t.Fatalf("exact public snapshot was rejected: %v %#v", err, ids)
+	}
+	if err := os.Chmod(path, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(`{"cityId":"`+cityA+`","readOnly":true,"exactEventIds":false}`), 0400); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(path, 0400); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := loadReplicaPublicSnapshot(path, cityA); err == nil {
+		t.Fatal("inexact public snapshot was accepted")
 	}
 }
 
