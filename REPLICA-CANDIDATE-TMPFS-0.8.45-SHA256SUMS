@@ -1,0 +1,3 @@
+1c934640f5933dcaaa3b447d152980d2ebc22077a62f9f94711aa545ce5b753f  replica-audit-shadow-0.8.44
+6d800eedd5d10b6e52d8b90c62c740624feac522baa6830bf769f2dfd65a3cc3  deploy/compose.replica-candidate-0.8.45.yaml
+9bd7dbf8c60245ff64e67a9094190bca62d0fa5ec9c28f4cff62a3cd54db93af  deploy/fix-replica-candidate-tmpfs-0.8.45.sh
