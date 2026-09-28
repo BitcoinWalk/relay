@@ -79,6 +79,18 @@ class ReplicaCandidateTmpfsTests(unittest.TestCase):
         self.assertIn("grep -q '\"delivered\":7'", installer)
         self.assertNotIn("grep -q '\"delivered\":8'", installer)
 
+    def test_visible_acceptance_digests_consistent_journal_copy(self):
+        installer = (DEPLOY / "resume-replica-visible-acceptance-0.8.50.sh").read_text()
+        stop = installer.index('systemctl stop bitcoinwalk-guide.service bitcoinwalk-relay.service')
+        copy = installer.index('cp -p "$source_journal" "$backup/source-replication-journal.db"')
+        start = installer.index('systemctl start bitcoinwalk-relay.service bitcoinwalk-guide.service', copy)
+        digest = installer.index('bolt_digest "$backup/source-replication-journal.db"', start)
+        self.assertLess(stop, copy)
+        self.assertLess(copy, start)
+        self.assertLess(start, digest)
+        self.assertNotIn('bolt_digest "$source_journal"', installer)
+        self.assertNotIn('RELAY_REPLICA_SHADOW_CONFIRM', installer)
+
 
 if __name__ == "__main__":
     unittest.main()
