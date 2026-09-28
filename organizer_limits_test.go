@@ -13,7 +13,7 @@ import (
 
 func initialWalkForLimitTest(t *testing.T, signer nostr.SecretKey, offset int) nostr.Event {
 	t.Helper()
-	start := time.Now().Add(48*time.Hour + time.Duration(offset)*time.Minute).Truncate(time.Second)
+	start := time.Now().Add((48 + time.Duration(offset)*24) * time.Hour).Truncate(time.Second)
 	event := nostr.Event{Kind: 31923, CreatedAt: nostr.Now() + nostr.Timestamp(offset), Content: "Test walk", Tags: nostr.Tags{
 		{"d", cityA + ":" + start.Format("2006-01-02")}, {"title", "BitcoinWalk Test City"}, {"summary", "BitcoinWalk in Test City"}, {"image", "https://example.com/image.jpg"},
 		{"start", strconv.FormatInt(start.Unix(), 10)}, {"D", strconv.FormatInt(start.Unix()/86400, 10)}, {"location", "Square"}, {"location", "1,2"}, {"t", "bitcoinwalk"}, {"r", "https://example.com/chat"},
