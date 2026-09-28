@@ -158,6 +158,9 @@ func run() error {
 	if path := os.Getenv("RELAY_REPLICA_DB_DIGEST"); path != "" {
 		return runReplicaDBDigest(path)
 	}
+	if path := os.Getenv("RELAY_REPLICA_JOURNAL_STABLE_DIGEST"); path != "" {
+		return runReplicaJournalStableDigest(path)
+	}
 	if os.Getenv("RELAY_REPLICA_POLICY_AUDIT_EVENT") != "" {
 		return runReplicaPolicyAudit()
 	}

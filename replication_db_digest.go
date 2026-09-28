@@ -35,9 +35,12 @@ func boltSequenceBytes(sequence uint64) []byte {
 	return encoded
 }
 
-func digestBoltBucket(digest hash.Hash, path []byte, bucket *bbolt.Bucket) error {
+func digestBoltBucket(digest hash.Hash, path []byte, bucket *bbolt.Bucket, skip func([]byte, []byte) bool) error {
 	return bucket.ForEach(func(key, value []byte) error {
 		if value != nil {
+			if skip != nil && skip(path, key) {
+				return nil
+			}
 			return writeDigestPart(digest, 'k', path, key, value)
 		}
 		child := bucket.Bucket(key)
@@ -51,11 +54,11 @@ func digestBoltBucket(digest hash.Hash, path []byte, bucket *bbolt.Bucket) error
 		if err := writeDigestPart(digest, 'b', childPath, boltSequenceBytes(child.Sequence())); err != nil {
 			return err
 		}
-		return digestBoltBucket(digest, childPath, child)
+		return digestBoltBucket(digest, childPath, child, skip)
 	})
 }
 
-func logicalBoltDigest(path string) (string, error) {
+func logicalBoltDigestFiltered(path string, skip func([]byte, []byte) bool) (string, error) {
 	info, err := os.Lstat(path)
 	if err != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 || info.Mode().Perm()&0022 != 0 {
 		return "", errors.New("bolt digest requires a non-writable regular file")
@@ -71,7 +74,7 @@ func logicalBoltDigest(path string) (string, error) {
 			if err := writeDigestPart(digest, 'B', name, boltSequenceBytes(bucket.Sequence())); err != nil {
 				return err
 			}
-			return digestBoltBucket(digest, name, bucket)
+			return digestBoltBucket(digest, name, bucket, skip)
 		})
 	})
 	if err != nil {
@@ -80,8 +83,27 @@ func logicalBoltDigest(path string) (string, error) {
 	return hex.EncodeToString(digest.Sum(nil)), nil
 }
 
+func logicalBoltDigest(path string) (string, error) {
+	return logicalBoltDigestFiltered(path, nil)
+}
+
+func logicalReplicaJournalStableDigest(path string) (string, error) {
+	return logicalBoltDigestFiltered(path, func(bucket, key []byte) bool {
+		return string(bucket) == string(replicaMetaBucket) && string(key) == string(replicaReconciledKey)
+	})
+}
+
 func runReplicaDBDigest(path string) error {
 	digest, err := logicalBoltDigest(path)
+	if err != nil {
+		return err
+	}
+	_, err = os.Stdout.WriteString(digest + "\n")
+	return err
+}
+
+func runReplicaJournalStableDigest(path string) error {
+	digest, err := logicalReplicaJournalStableDigest(path)
 	if err != nil {
 		return err
 	}

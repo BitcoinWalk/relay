@@ -91,6 +91,15 @@ class ReplicaCandidateTmpfsTests(unittest.TestCase):
         self.assertNotIn('bolt_digest "$source_journal"', installer)
         self.assertNotIn('RELAY_REPLICA_SHADOW_CONFIRM', installer)
 
+    def test_completed_acceptance_uses_stable_journal_digest_without_delivery(self):
+        installer = (DEPLOY / "complete-replica-visible-acceptance-0.8.51.sh").read_text()
+        self.assertIn('RELAY_REPLICA_JOURNAL_STABLE_DIGEST="$1"', installer)
+        self.assertIn('journal.before.digest', installer)
+        self.assertIn('journal.after.digest', installer)
+        self.assertNotIn('RELAY_REPLICA_DB_DIGEST', installer)
+        self.assertNotIn('RELAY_REPLICA_SHADOW_CONFIRM', installer)
+        self.assertNotIn('systemctl stop', installer)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -78,3 +78,56 @@ func TestLogicalBoltDigestTracksRecordsNotFileMetadata(t *testing.T) {
 		t.Fatal("logical digest accepted a group/world-writable database")
 	}
 }
+
+func TestReplicaJournalStableDigestExcludesOnlyReconciliationTimestamp(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "journal.db")
+	write := func(reconciled, event string) {
+		db, err := bbolt.Open(path, 0600, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = db.Update(func(tx *bbolt.Tx) error {
+			metadata, err := tx.CreateBucketIfNotExists(replicaMetaBucket)
+			if err != nil {
+				return err
+			}
+			if err := metadata.Put(replicaReconciledKey, []byte(reconciled)); err != nil {
+				return err
+			}
+			outbox, err := tx.CreateBucketIfNotExists(replicaOutboxBucket)
+			if err != nil {
+				return err
+			}
+			return outbox.Put([]byte("event"), []byte(event))
+		})
+		if closeErr := db.Close(); err == nil {
+			err = closeErr
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("100", "one")
+	stableOne, err := logicalReplicaJournalStableDigest(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fullOne, err := logicalBoltDigest(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	write("200", "one")
+	stableTwo, err := logicalReplicaJournalStableDigest(path)
+	if err != nil || stableOne != stableTwo {
+		t.Fatalf("stable digest changed for reconciliation timestamp: %s %s %v", stableOne, stableTwo, err)
+	}
+	fullTwo, err := logicalBoltDigest(path)
+	if err != nil || fullOne == fullTwo {
+		t.Fatalf("full digest ignored reconciliation timestamp: %s %s %v", fullOne, fullTwo, err)
+	}
+	write("300", "two")
+	stableThree, err := logicalReplicaJournalStableDigest(path)
+	if err != nil || stableTwo == stableThree {
+		t.Fatalf("stable digest ignored operational record change: %s %s %v", stableTwo, stableThree, err)
+	}
+}
