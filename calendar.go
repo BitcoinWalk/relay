@@ -122,17 +122,29 @@ func (p *organizerPolicy) checkCalendar(event nostr.Event) error {
 
 func (p *organizerPolicy) checkCalendarRead(event nostr.Event) error {
 	if value, ok := exactCalendarTag(event, "bitcoinwalk"); ok && value == "initial-proposal-v1" {
-		approval := p.currentApproval(mustCalendarCity(event))
-		if approval == nil {
+		cityID := mustCalendarCity(event)
+		if p.currentApproval(cityID) == nil {
 			return errors.New("restricted: initial walk is awaiting approval")
 		}
-		var decision cityDecision
-		if json.Unmarshal([]byte(approval.Content), &decision) != nil || decision.InitialEventID != event.ID.Hex() {
-			return errors.New("restricted: initial walk was not released by approval")
+		var revision *nostr.Event
+		seen := 0
+		for approval := range p.db.QueryEvents(nostr.Filter{Kinds: []nostr.Kind{30304}, Authors: []nostr.PubKey{p.admin}}, 10001) {
+			seen++
+			if seen > 10000 {
+				return errors.New("restricted: city approval history exceeds the safe read limit")
+			}
+			var decision cityDecision
+			if json.Unmarshal([]byte(approval.Content), &decision) != nil || decision.CityID != cityID || decision.Status != "approved" || decision.InitialEventID != event.ID.Hex() {
+				continue
+			}
+			candidate := p.byID(decision.RevisionID)
+			if candidate != nil && candidate.Kind == 30303 && candidate.PubKey == event.PubKey {
+				revision = candidate
+				break
+			}
 		}
-		revision := p.byID(decision.RevisionID)
-		if revision == nil || revision.PubKey != event.PubKey {
-			return errors.New("invalid: initial walk revision unavailable")
+		if revision == nil {
+			return errors.New("restricted: initial walk was not released by approval")
 		}
 		city, err := parseDraft(*revision)
 		if err != nil {
