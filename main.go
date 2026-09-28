@@ -152,6 +152,9 @@ func run() error {
 	if os.Getenv("RELAY_REPLICA_POLICY_AUDIT_EVENT") != "" {
 		return runReplicaPolicyAudit()
 	}
+	if os.Getenv("RELAY_REPLICA_SHADOW_CITY") != "" {
+		return runReplicaShadowBackfill()
+	}
 	if os.Getenv("RELAY_REPLICA_REPLAY_EVENT") != "" {
 		return runReplicaReplay()
 	}

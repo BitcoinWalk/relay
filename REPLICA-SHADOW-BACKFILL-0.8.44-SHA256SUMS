@@ -1,0 +1,5 @@
+107a7802d5fc61d2be98e1a57cc0f7d90c6a18a3fec29fc697304655796cf6ab  bitcoinwalk-relay-replica-shadow-0.8.44
+1c934640f5933dcaaa3b447d152980d2ebc22077a62f9f94711aa545ce5b753f  replica-audit-shadow-0.8.44
+5a3584810756b52319e134b22d3060db79330bbda10ca3ab245400c90cdb2b0a  deploy/capture-city-directory-root-0.8.35.mjs
+7b2c82e0e01a8359698e407689f7f2adf507a1f9161ef39f8097905667af1647  deploy/backup-replica-candidate-0.8.44.sh
+09f12efdd483881407fca23ab64250bb3d4b70acabf1974bae6da50127655edc  deploy/backfill-replica-candidate-0.8.44.sh

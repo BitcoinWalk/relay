@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"time"
 
 	"go.etcd.io/bbolt"
@@ -13,6 +14,15 @@ import (
 
 const replicaReplayConfirmation = "staging-idempotence-v1"
 const replicaAlertRehearsalConfirmation = "staging-alert-transition-v1"
+const replicaShadowBackfillConfirmation = "production-candidate-shadow-v1"
+
+type replicaShadowBackfillResult struct {
+	CityID               string `json:"cityId"`
+	SourceDestination    string `json:"sourceDestination"`
+	CandidateDestination string `json:"candidateDestination"`
+	Delivered            int    `json:"delivered"`
+	JournalMode          string `json:"journalMode"`
+}
 
 func validateAcknowledgedReplicaRow(row *replicaOutboxRow, eventID string) error {
 	if row == nil || row.EventID != eventID || row.Status != "acknowledged" || row.Envelope == nil || row.Control != nil {
@@ -67,6 +77,127 @@ func loadAcknowledgedReplicaEnvelope(path, eventID string) (*replicaDeliveryEnve
 	copy := *envelope
 	copy.Bundle = append(json.RawMessage(nil), envelope.Bundle...)
 	return &copy, nil
+}
+
+func loadReplicaShadowEnvelopes(path, cityID, sourceDestination, candidateDestination string) ([]replicaDeliveryEnvelope, error) {
+	if path == "" || !uuidPattern.MatchString(cityID) {
+		return nil, errors.New("replica shadow backfill requires a journal and valid city")
+	}
+	source, sourceErr := normalizeReplicaDestination(sourceDestination)
+	candidate, candidateErr := normalizeReplicaDestination(candidateDestination)
+	if sourceErr != nil || candidateErr != nil || source != sourceDestination || candidate != candidateDestination || source == candidate {
+		return nil, errors.New("replica shadow backfill requires distinct normalized destinations")
+	}
+	info, err := os.Lstat(path)
+	if err != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 || info.Mode().Perm()&0022 != 0 {
+		return nil, errors.New("replica shadow journal must be a non-writable regular file")
+	}
+	db, err := bbolt.Open(path, 0600, &bbolt.Options{ReadOnly: true, Timeout: time.Second})
+	if err != nil {
+		return nil, fmt.Errorf("open replica shadow journal read-only: %w", err)
+	}
+	defer db.Close()
+	envelopes := make([]replicaDeliveryEnvelope, 0)
+	err = db.View(func(tx *bbolt.Tx) error {
+		bucket := tx.Bucket(replicaOutboxBucket)
+		if bucket == nil {
+			return errors.New("replica shadow outbox is unavailable")
+		}
+		return bucket.ForEach(func(_, data []byte) error {
+			var row replicaOutboxRow
+			if err := json.Unmarshal(data, &row); err != nil {
+				return err
+			}
+			if row.CityID != cityID {
+				return nil
+			}
+			if row.Destination != source {
+				return errors.New("replica shadow source destination mismatch")
+			}
+			switch row.Status {
+			case "acknowledged":
+				if err := validateAcknowledgedReplicaRow(&row, row.EventID); err != nil {
+					return err
+				}
+				envelope := *row.Envelope
+				envelope.Bundle = append(json.RawMessage(nil), row.Envelope.Bundle...)
+				envelope.Destination = candidate
+				envelopes = append(envelopes, envelope)
+			case "blocked", "canceled", "revoked", "stale-source":
+				return nil
+			default:
+				return errors.New("replica shadow source outbox is not settled")
+			}
+			return nil
+		})
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(envelopes) == 0 {
+		return nil, errors.New("replica shadow source has no acknowledged occurrences")
+	}
+	slices.SortFunc(envelopes, func(a, b replicaDeliveryEnvelope) int {
+		if a.SourceSequence < b.SourceSequence {
+			return -1
+		}
+		if a.SourceSequence > b.SourceSequence {
+			return 1
+		}
+		return 0
+	})
+	for index := 1; index < len(envelopes); index++ {
+		if envelopes[index-1].SourceSequence >= envelopes[index].SourceSequence {
+			return nil, errors.New("replica shadow source sequence is not strictly increasing")
+		}
+	}
+	return envelopes, nil
+}
+
+func shadowBackfillReplica(ctx context.Context, journalPath, keyPath, cityID, sourceDestination, candidateDestination, confirmation string, transport replicaTransport) (replicaShadowBackfillResult, error) {
+	result := replicaShadowBackfillResult{CityID: cityID, SourceDestination: sourceDestination, CandidateDestination: candidateDestination, JournalMode: "read-only"}
+	if confirmation != replicaShadowBackfillConfirmation {
+		return result, errors.New("replica shadow backfill requires the exact production-candidate confirmation")
+	}
+	envelopes, err := loadReplicaShadowEnvelopes(journalPath, cityID, sourceDestination, candidateDestination)
+	if err != nil {
+		return result, err
+	}
+	if transport == nil {
+		serviceKey, err := loadReplicaServiceKey(keyPath)
+		if err != nil {
+			return result, fmt.Errorf("load replica shadow key: %w", err)
+		}
+		transport = newReplicaWebSocketTransport(serviceKey)
+	}
+	for _, envelope := range envelopes {
+		ack, err := transport(ctx, candidateDestination, envelope)
+		if err != nil {
+			return result, err
+		}
+		if !ack.Accepted || ack.EventID != envelope.OccurrenceID || ack.SourceSequence != envelope.SourceSequence {
+			return result, errors.New("replica shadow backfill received an inexact acknowledgement")
+		}
+		result.Delivered++
+	}
+	return result, nil
+}
+
+func runReplicaShadowBackfill() error {
+	result, err := shadowBackfillReplica(
+		context.Background(),
+		os.Getenv("RELAY_REPLICA_JOURNAL"),
+		os.Getenv("RELAY_REPLICA_DELIVERY_KEY_FILE"),
+		os.Getenv("RELAY_REPLICA_SHADOW_CITY"),
+		os.Getenv("RELAY_REPLICA_SHADOW_SOURCE"),
+		os.Getenv("RELAY_REPLICA_SHADOW_CANDIDATE"),
+		os.Getenv("RELAY_REPLICA_SHADOW_CONFIRM"),
+		nil,
+	)
+	if err != nil {
+		return err
+	}
+	return json.NewEncoder(os.Stdout).Encode(result)
 }
 
 // armAcknowledgedReplicaAlertRehearsal moves one exact, already-acknowledged
