@@ -100,6 +100,20 @@ class ReplicaCandidateTmpfsTests(unittest.TestCase):
         self.assertNotIn('RELAY_REPLICA_SHADOW_CONFIRM', installer)
         self.assertNotIn('systemctl stop', installer)
 
+    def test_post_backfill_rehearsal_is_backup_first_and_restart_stable(self):
+        installer = (DEPLOY / "backup-restart-replica-candidate-0.8.52.sh").read_text()
+        stop = installer.index('docker stop -t 20 "$container"')
+        backup = installer.index('cp -p "$state" "$backup/events.db"')
+        start = installer.index('docker start "$container"', backup)
+        restart = installer.index('docker restart -t 20 "$container"', start)
+        self.assertLess(stop, backup)
+        self.assertLess(backup, start)
+        self.assertLess(start, restart)
+        self.assertIn('candidate.after-start.json', installer)
+        self.assertIn('candidate.after-restart.json', installer)
+        self.assertIn('ReadonlyRootfs', installer)
+        self.assertIn('PortBindings', installer)
+
 
 if __name__ == "__main__":
     unittest.main()
