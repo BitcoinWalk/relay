@@ -14,6 +14,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	_ "time/tzdata"
 
 	"fiatjaf.com/nostr"
 	"fiatjaf.com/nostr/eventstore/boltdb"
@@ -123,6 +124,14 @@ func newRelay(dbPath string, writers map[nostr.PubKey]bool) (*khatru.Relay, *bol
 }
 
 func run() error {
+	if zone := os.Getenv("RELAY_TIMEZONE_PROBE"); zone != "" {
+		location, err := time.LoadLocation(zone)
+		if err != nil || location.String() != zone {
+			return errors.New("timezone probe failed")
+		}
+		fmt.Println(location.String())
+		return nil
+	}
 	if os.Getenv("RELAY_CITY_DIRECTORY_SUCCESSOR_REHEARSAL") != "" {
 		return runCityDirectorySuccessorRehearsal()
 	}

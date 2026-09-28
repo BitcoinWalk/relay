@@ -30,6 +30,24 @@ class ReplicaCandidateTmpfsTests(unittest.TestCase):
         self.assertIn('container["HostConfig"].get("Tmpfs", {})', installer)
         self.assertNotIn('mount for mount in container["Mounts"]', installer)
 
+    def test_candidate_binary_embeds_timezone_database(self):
+        source = (DEPLOY.parent / "main.go").read_text()
+        self.assertIn('_ "time/tzdata"', source)
+        self.assertIn('RELAY_TIMEZONE_PROBE', source)
+
+    def test_timezone_upgrade_preserves_hardened_runtime(self):
+        compose = (DEPLOY / "compose.replica-candidate-0.8.47.yaml").read_text()
+        self.assertIn('image: bitcoinwalk-replica-candidate:0.8.47', compose)
+        self.assertIn('read_only: true', compose)
+        self.assertIn('/tmp:rw,noexec,nosuid,nodev,size=32m,mode=0700,uid=65532,gid=65532', compose)
+        self.assertNotIn('ports:', compose)
+
+    def test_timezone_upgrade_probes_valid_and_invalid_zones_in_scratch_image(self):
+        installer = (DEPLOY / "upgrade-replica-candidate-timezone-0.8.47.sh").read_text()
+        self.assertIn('RELAY_TIMEZONE_PROBE=America/Chicago', installer)
+        self.assertIn('RELAY_TIMEZONE_PROBE=Not/A_Real_Zone', installer)
+        self.assertIn('cp -p "$state" "$backup/events.db"', installer)
+
 
 if __name__ == "__main__":
     unittest.main()
