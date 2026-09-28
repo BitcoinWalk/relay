@@ -19,11 +19,16 @@ class ReplicaCandidateTmpfsTests(unittest.TestCase):
         self.assertIn('/tmp:rw,noexec,nosuid,nodev,size=32m,mode=0700,uid=65532,gid=65532', compose)
 
     def test_installer_backs_up_database_before_recreation(self):
-        installer = (DEPLOY / "fix-replica-candidate-tmpfs-0.8.45.sh").read_text()
+        installer = (DEPLOY / "resume-replica-candidate-tmpfs-0.8.46.sh").read_text()
         backup = installer.index('cp -p "$state" "$backup/events.db"')
         recreate = installer.index('up -d --no-build --force-recreate', backup)
         self.assertLess(backup, recreate)
         self.assertIn('install -o root -g root -m 0444 "$backup/compose.before.yaml" "$target"', installer)
+
+    def test_verifier_uses_authoritative_hostconfig_tmpfs(self):
+        installer = (DEPLOY / "resume-replica-candidate-tmpfs-0.8.46.sh").read_text()
+        self.assertIn('container["HostConfig"].get("Tmpfs", {})', installer)
+        self.assertNotIn('mount for mount in container["Mounts"]', installer)
 
 
 if __name__ == "__main__":
