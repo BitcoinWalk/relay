@@ -420,6 +420,16 @@ func TestInitialWalkIsHiddenUntilExactApproval(t *testing.T) {
 	if count() != 2 {
 		t.Fatal("bundle validation changed live source visibility")
 	}
+	// Approving a later city-profile edit must not hide the exact first walk
+	// released by the retained initial approval. Ordinary occurrences already
+	// use the same retained-approval read semantics.
+	edit := draftEvent(t, creator, cityA, 6)
+	accept(t, relay, edit)
+	editApproval := workflowEvent(t, admin, 30304, cityDecision{CityID: cityA, RevisionID: edit.ID.Hex(), Status: "approved"}, nostr.Tags{{"d", cityA}, {"e", edit.ID.Hex(), "", "city-revision"}, {"status", "approved"}}, 7)
+	accept(t, relay, editApproval)
+	if count() != 2 {
+		t.Fatal("later city-profile approval hid a retained approved occurrence")
+	}
 }
 
 func TestPhotoFreeInitialWalkIsAccepted(t *testing.T) {
