@@ -77,6 +77,30 @@ func TestListenAddressRequiresExplicitDirectoryContainerMode(t *testing.T) {
 	}
 }
 
+func TestReplicaReceiverContainerListenRequiresCompleteIsolatedScope(t *testing.T) {
+	complete := []string{"true", "true", "be8514a4-9df0-4159-a517-71f65761cbbe", strings.Repeat("a", 64), "wss://replica.bitcoinwalk.org/"}
+	allowed, err := replicaReceiverContainerListenAllowed(complete[0], complete[1], complete[2], complete[3], complete[4])
+	if err != nil || !allowed {
+		t.Fatalf("complete receiver scope rejected: %v", err)
+	}
+	for name, values := range map[string][]string{
+		"invalid flag":    {"yes", complete[1], complete[2], complete[3], complete[4]},
+		"organizer off":   {complete[0], "false", complete[2], complete[3], complete[4]},
+		"missing city":    {complete[0], complete[1], "", complete[3], complete[4]},
+		"missing service": {complete[0], complete[1], complete[2], "", complete[4]},
+		"missing target":  {complete[0], complete[1], complete[2], complete[3], ""},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if allowed, err := replicaReceiverContainerListenAllowed(values[0], values[1], values[2], values[3], values[4]); err == nil || allowed {
+				t.Fatal("unsafe receiver container listen accepted")
+			}
+		})
+	}
+	if allowed, err := replicaReceiverContainerListenAllowed("false", "false", "", "", ""); err != nil || allowed {
+		t.Fatalf("disabled receiver container mode rejected: %v", err)
+	}
+}
+
 func TestWebSocketAuthPublicReadAndPersistence(t *testing.T) {
 	sk := nostr.Generate()
 	pk := nostr.GetPublicKey(sk)

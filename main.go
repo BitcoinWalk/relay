@@ -43,16 +43,29 @@ func parseWriters(value string) (map[nostr.PubKey]bool, error) {
 	return writers, nil
 }
 
-func validateListenAddress(listen string, allowDirectoryContainer bool) error {
+func validateListenAddress(listen string, allowContainer bool) error {
 	host, _, err := net.SplitHostPort(listen)
 	if err != nil {
 		return errors.New("RELAY_LISTEN must use a loopback IP; public access requires a TLS reverse proxy")
 	}
 	ip := net.ParseIP(host)
-	if ip != nil && (ip.IsLoopback() || allowDirectoryContainer && ip.Equal(net.IPv4zero)) {
+	if ip != nil && (ip.IsLoopback() || allowContainer && ip.Equal(net.IPv4zero)) {
 		return nil
 	}
 	return errors.New("RELAY_LISTEN must use a loopback IP; public access requires a TLS reverse proxy")
+}
+
+func replicaReceiverContainerListenAllowed(flag, organizerMode, city, service, destination string) (bool, error) {
+	if flag != "false" && flag != "true" {
+		return false, errors.New("RELAY_REPLICA_RECEIVER_CONTAINER_LISTEN must be true or false")
+	}
+	if flag == "false" {
+		return false, nil
+	}
+	if organizerMode != "true" || city == "" || service == "" || destination == "" {
+		return false, errors.New("replica receiver container listen requires organizer mode and the complete receiver scope")
+	}
+	return true, nil
 }
 
 func writePolicy(writers map[nostr.PubKey]bool) func(context.Context, nostr.Event) (bool, string) {
@@ -189,8 +202,18 @@ func run() error {
 	if containerListen == "true" && directoryTransportMode == "" {
 		return errors.New("container listen is restricted to the city directory transport")
 	}
+	receiverCity := os.Getenv("RELAY_REPLICA_RECEIVER_CITY")
+	receiverService := os.Getenv("RELAY_REPLICA_RECEIVER_SERVICE_PUBKEY")
+	receiverDestination := os.Getenv("RELAY_REPLICA_RECEIVER_DESTINATION")
+	receiverContainerListen, err := replicaReceiverContainerListenAllowed(env("RELAY_REPLICA_RECEIVER_CONTAINER_LISTEN", "false"), env("RELAY_ORGANIZER_MODE", "false"), receiverCity, receiverService, receiverDestination)
+	if err != nil {
+		return err
+	}
+	if containerListen == "true" && receiverContainerListen {
+		return errors.New("container listen cannot enable directory and replica receiver modes together")
+	}
 	listen := env("RELAY_LISTEN", "127.0.0.1:3334")
-	if err := validateListenAddress(listen, containerListen == "true"); err != nil {
+	if err := validateListenAddress(listen, containerListen == "true" || receiverContainerListen); err != nil {
 		return err
 	}
 	writers, err := parseWriters(env("RELAY_WRITERS", adminHex))
@@ -277,9 +300,6 @@ func run() error {
 			attachReplicaJournal(organizer, journal)
 			log.Printf("Replica acceptance journal enabled for %d operator-configured paid city relay(s); recovered %d missing record(s)", len(registry.destinations), recovered)
 		}
-		receiverCity := os.Getenv("RELAY_REPLICA_RECEIVER_CITY")
-		receiverService := os.Getenv("RELAY_REPLICA_RECEIVER_SERVICE_PUBKEY")
-		receiverDestination := os.Getenv("RELAY_REPLICA_RECEIVER_DESTINATION")
 		if receiverCity != "" || receiverService != "" || receiverDestination != "" {
 			if receiverCity == "" || receiverService == "" || receiverDestination == "" {
 				return errors.New("RELAY_REPLICA_RECEIVER_CITY, RELAY_REPLICA_RECEIVER_SERVICE_PUBKEY and RELAY_REPLICA_RECEIVER_DESTINATION must be configured together")

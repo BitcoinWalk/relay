@@ -1,0 +1,4 @@
+ca96ee075a7d75d57272a78c4acde134553f07ed69daac5104c9c96eb60b1519  bitcoinwalk-relay-replica-candidate-0.8.43
+162ff743574549a9cffe9f5fcc71622e5fa8e8b0c61699333a90cbd48e0eeb5d  deploy/Dockerfile.replica-candidate-0.8.43
+5e127c830d2f376dd96f99d6c68728ed3a0a1416c5db5f3a39bed798c1a08b62  deploy/compose.replica-candidate-0.8.43.yaml
+d2c807af3b837c8da10aac17041c5df6c2b0df4e485717b0a7f863d4f62b32fc  deploy/install-replica-candidate-docker-0.8.43.sh

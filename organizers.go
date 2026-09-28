@@ -479,6 +479,6 @@ func enableOrganizers(relay *khatru.Relay, db *boltdb.BoltBackend, admin nostr.P
 	// stopping publication; the calendar guards suppress deleted IDs permanently.
 	relay.DeleteEvent = nil
 	relay.Info.Description = env("RELAY_DESCRIPTION", "BitcoinWalk staging: authenticated organizer proposals, admin-managed city editors, public reads.")
-	relay.Info.Version = "bitcoinwalk-organizers-0.8.23"
+	relay.Info.Version = env("RELAY_VERSION", "bitcoinwalk-organizers-0.8.23")
 	return p
 }

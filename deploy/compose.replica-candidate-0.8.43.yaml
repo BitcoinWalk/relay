@@ -1,0 +1,41 @@
+services:
+  receiver:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: bitcoinwalk-replica-candidate:0.8.43
+    container_name: bitcoinwalk-replica-candidate
+    init: true
+    restart: unless-stopped
+    read_only: true
+    user: "65532:65532"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 64
+    mem_limit: 512m
+    stop_grace_period: 20s
+    environment:
+      RELAY_LISTEN: 0.0.0.0:3344
+      RELAY_REPLICA_RECEIVER_CONTAINER_LISTEN: "true"
+      RELAY_DB: /data/events.db
+      RELAY_ORGANIZER_MODE: "true"
+      RELAY_REPLICA_RECEIVER_CITY: be8514a4-9df0-4159-a517-71f65761cbbe
+      RELAY_REPLICA_RECEIVER_SERVICE_PUBKEY: a6c0c0aba1385505e1e1db704934a67d93fac6c5561d8f256e6dcac1df2ed448
+      RELAY_REPLICA_RECEIVER_DESTINATION: wss://replica.bitcoinwalk.org/
+      RELAY_NAME: BitcoinWalk Memphis production candidate
+      RELAY_VERSION: bitcoinwalk-replica-candidate-0.8.43
+      RELAY_DESCRIPTION: Isolated pre-migration receiver candidate. Public reads; authenticated scoped replication writes only.
+      RELAY_LANDING_TEXT: BitcoinWalk Memphis production receiver candidate. Not yet present in the signed city directory or live replication registry.
+    volumes:
+      - /var/lib/bitcoinwalk-replica-candidate:/data
+    expose:
+      - "3344"
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true
+    name: root_my_custom_network
