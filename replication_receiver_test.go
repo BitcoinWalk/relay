@@ -209,6 +209,18 @@ func TestReplicaReceiverStagesInstallsAndAcknowledgesExactly(t *testing.T) {
 	if err != nil || !ack.Accepted || ack.SourceSequence != second.SourceSequence {
 		t.Fatalf("next ordered delivery failed: %#v %v", ack, err)
 	}
+	replacement := makeEnvelope("2026-10-17", 5, 13)
+	ack, err = receiver.receiveReplicaEnvelope(ctx, replacement)
+	if err != nil || !ack.Accepted || ack.SourceSequence != replacement.SourceSequence {
+		t.Fatalf("addressable replacement delivery failed: %#v %v", ack, err)
+	}
+	if destinationPolicy.byID(second.OccurrenceID) != nil || destinationPolicy.byID(replacement.OccurrenceID) == nil {
+		t.Fatal("replica receiver retained a superseded addressable occurrence")
+	}
+	ack, err = receiver.receiveReplicaEnvelope(ctx, second)
+	if err != nil || !ack.Accepted || ack.SourceSequence != second.SourceSequence {
+		t.Fatalf("superseded exact replay was not idempotent: %#v %v", ack, err)
+	}
 	reopened, err := newReplicaReceiver(destinationPolicy, scope)
 	if err != nil {
 		t.Fatal(err)
@@ -229,26 +241,26 @@ func TestReplicaReceiverStagesInstallsAndAcknowledgesExactly(t *testing.T) {
 	cancellation := nostr.Event{Kind: 5, CreatedAt: first.Event.CreatedAt + 1, Tags: nostr.Tags{{"e", first.OccurrenceID}, {"k", "31923"}, {"i", cityA}}, Content: "CANCEL WALK: replicated organizer cancellation"}
 	cancellation.Sign(creator)
 	accept(t, sourceRelay, cancellation)
-	cancellationEnvelope := replicaDeliveryEnvelope{Version: replicaEnvelopeVersion, Action: "cancellation", CityID: cityA, Destination: destination, OccurrenceID: first.OccurrenceID, SourceSequence: 13, Event: cancellation}
+	cancellationEnvelope := replicaDeliveryEnvelope{Version: replicaEnvelopeVersion, Action: "cancellation", CityID: cityA, Destination: destination, OccurrenceID: first.OccurrenceID, SourceSequence: 14, Event: cancellation}
 	ack, err = transport(ctx, destination, cancellationEnvelope)
-	if err != nil || !ack.Accepted || ack.EventID != cancellation.ID.Hex() || ack.SourceSequence != 13 {
+	if err != nil || !ack.Accepted || ack.EventID != cancellation.ID.Hex() || ack.SourceSequence != 14 {
 		t.Fatalf("ordered cancellation was not installed: %#v %v", ack, err)
 	}
 	if destinationPolicy.checkCalendarRead(first.Event) == nil {
 		t.Fatal("replicated cancellation left its occurrence public")
 	}
-	if err := destinationPolicy.checkCalendarRead(second.Event); err != nil {
+	if err := destinationPolicy.checkCalendarRead(replacement.Event); err != nil {
 		t.Fatalf("cancellation hid an unrelated occurrence: %v", err)
 	}
 
 	revocation := workflowEvent(t, admin, 30304, cityDecision{CityID: cityA, RevisionID: revision.ID.Hex(), Status: "revoked"}, nostr.Tags{{"d", cityA}, {"e", revision.ID.Hex(), "", "city-revision"}, {"status", "revoked"}}, 20)
 	accept(t, sourceRelay, revocation)
-	revocationEnvelope := replicaDeliveryEnvelope{Version: replicaEnvelopeVersion, Action: "revocation", CityID: cityA, Destination: destination, SourceSequence: 14, Event: revocation}
+	revocationEnvelope := replicaDeliveryEnvelope{Version: replicaEnvelopeVersion, Action: "revocation", CityID: cityA, Destination: destination, SourceSequence: 15, Event: revocation}
 	ack, err = transport(ctx, destination, revocationEnvelope)
-	if err != nil || !ack.Accepted || ack.EventID != revocation.ID.Hex() || ack.SourceSequence != 14 {
+	if err != nil || !ack.Accepted || ack.EventID != revocation.ID.Hex() || ack.SourceSequence != 15 {
 		t.Fatalf("ordered revocation was not installed: %#v %v", ack, err)
 	}
-	if destinationPolicy.checkCalendarRead(second.Event) == nil {
+	if destinationPolicy.checkCalendarRead(replacement.Event) == nil {
 		t.Fatal("replicated city revocation left an occurrence public")
 	}
 	ack, err = transport(ctx, destination, revocationEnvelope)

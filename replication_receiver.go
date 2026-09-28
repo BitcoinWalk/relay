@@ -54,7 +54,17 @@ func newReplicaReceiver(policy *organizerPolicy, scope replicaScope) (*replicaRe
 	if err != nil || destination != scope.Destination {
 		return nil, errors.New("restricted: replica receiver destination must be normalized")
 	}
-	receiver := &replicaReceiver{policy: policy, scope: scope, saveEvent: policy.db.SaveEvent}
+	receiver := &replicaReceiver{
+		policy: policy,
+		scope:  scope,
+		saveEvent: func(event nostr.Event) error {
+			if event.Kind.IsReplaceable() || event.Kind.IsAddressable() {
+				_, err := policy.db.ReplaceEvent(event)
+				return err
+			}
+			return policy.db.SaveEvent(event)
+		},
+	}
 	fingerprint := receiver.scopeFingerprint()
 	if err := policy.db.DB.Update(func(tx *bbolt.Tx) error {
 		for _, name := range [][]byte{replicaReceiverImportsBucket, replicaReceiverHeadsBucket, replicaReceiverMetaBucket} {
@@ -335,6 +345,29 @@ func (r *replicaReceiver) markInstalled(envelope replicaDeliveryEnvelope) error 
 	})
 }
 
+func (r *replicaReceiver) installedSupersedingOccurrence(envelope replicaDeliveryEnvelope) (*nostr.Event, error) {
+	if replicaEnvelopeAction(envelope) != "occurrence" || !envelope.Event.Kind.IsAddressable() {
+		return nil, nil
+	}
+	var superseding *nostr.Event
+	err := r.policy.db.DB.View(func(tx *bbolt.Tx) error {
+		return tx.Bucket(replicaReceiverImportsBucket).ForEach(func(_, data []byte) error {
+			var record replicaReceiverRecord
+			if err := json.Unmarshal(data, &record); err != nil {
+				return err
+			}
+			candidate := record.Envelope
+			if record.Status != "installed" || replicaEnvelopeAction(candidate) != "occurrence" || candidate.SourceSequence <= envelope.SourceSequence || candidate.Event.Kind != envelope.Event.Kind || candidate.Event.PubKey != envelope.Event.PubKey || candidate.Event.Tags.GetD() != envelope.Event.Tags.GetD() || !nostr.IsOlder(envelope.Event, candidate.Event) {
+				return nil
+			}
+			copy := candidate.Event
+			superseding = &copy
+			return nil
+		})
+	})
+	return superseding, err
+}
+
 // receiveReplicaEnvelope is intentionally not exposed on the network. A later
 // increment may call it from a bounded WSS handler after authenticating the
 // configured service identity. The durable stage and city checkpoint commit in
@@ -360,6 +393,16 @@ func (r *replicaReceiver) receiveReplicaEnvelope(ctx context.Context, envelope r
 		stored := r.policy.byID(replicaEnvelopeAckID(envelope))
 		if stored != nil && stored.ID == envelope.Event.ID && stored.CheckID() && stored.VerifySignature() {
 			return replicaDeliveryAck{EventID: replicaEnvelopeAckID(envelope), SourceSequence: envelope.SourceSequence, Accepted: true}, nil
+		}
+		superseding, err := r.installedSupersedingOccurrence(envelope)
+		if err != nil {
+			return replicaDeliveryAck{}, err
+		}
+		if superseding != nil {
+			stored = r.policy.byID(superseding.ID.Hex())
+			if stored != nil && stored.ID == superseding.ID && stored.CheckID() && stored.VerifySignature() {
+				return replicaDeliveryAck{EventID: replicaEnvelopeAckID(envelope), SourceSequence: envelope.SourceSequence, Accepted: true}, nil
+			}
 		}
 	}
 	if replicaEnvelopeAction(envelope) == "cancellation" {

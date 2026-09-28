@@ -48,6 +48,21 @@ class ReplicaCandidateTmpfsTests(unittest.TestCase):
         self.assertIn('RELAY_TIMEZONE_PROBE=Not/A_Real_Zone', installer)
         self.assertIn('cp -p "$state" "$backup/events.db"', installer)
 
+    def test_replacement_candidate_keeps_hardened_runtime(self):
+        compose = (DEPLOY / "compose.replica-candidate-0.8.48.yaml").read_text()
+        self.assertIn('image: bitcoinwalk-replica-candidate:0.8.48', compose)
+        self.assertIn('read_only: true', compose)
+        self.assertIn('/tmp:rw,noexec,nosuid,nodev,size=32m,mode=0700,uid=65532,gid=65532', compose)
+        self.assertNotIn('ports:', compose)
+
+    def test_replacement_restore_is_backup_first_and_requires_empty_readback(self):
+        installer = (DEPLOY / "restore-replica-candidate-replacement-0.8.48.sh").read_text()
+        dirty_backup = installer.index('cp -p "$state" "$backup/events.dirty.db"')
+        restore = installer.index('install -o 65532 -g 65532 -m 0600 "$restore/events.db" "$state"')
+        self.assertLess(dirty_backup, restore)
+        self.assertIn('report["source"]["occurrenceIds"]', installer)
+        self.assertIn('restored candidate is not empty', installer)
+
 
 if __name__ == "__main__":
     unittest.main()
