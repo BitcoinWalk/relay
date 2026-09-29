@@ -181,6 +181,23 @@ func (p *organizerPolicy) revisionDecided(id string) bool {
 	return false
 }
 
+// Only an exact retained release permits restoring a past initial walk.
+// Revocations do not erase that provenance; new submissions still need a future date.
+func (p *organizerPolicy) previouslyReleasedInitial(cityID, revisionID, initialID string) bool {
+	seen := 0
+	for event := range p.db.QueryEvents(nostr.Filter{Kinds: []nostr.Kind{30304}, Authors: []nostr.PubKey{p.admin}}, 10001) {
+		seen++
+		if seen > 10000 {
+			return false
+		}
+		var decision cityDecision
+		if json.Unmarshal([]byte(event.Content), &decision) == nil && decision.Status == "approved" && decision.CityID == cityID && decision.RevisionID == revisionID && decision.InitialEventID == initialID && event.CheckID() && event.VerifySignature() {
+			return true
+		}
+	}
+	return false
+}
+
 func (p *organizerPolicy) hasOtherPendingCity(author nostr.PubKey, cityID string) bool {
 	for event := range p.db.QueryEvents(nostr.Filter{Kinds: []nostr.Kind{30303}, Authors: []nostr.PubKey{author}}, 501) {
 		city, err := parseDraft(event)
@@ -408,7 +425,8 @@ func (p *organizerPolicy) check(ctx context.Context, event nostr.Event) error {
 				if proposal == nil || proposal.Kind != 31923 || proposal.PubKey != revision.PubKey {
 					return errors.New("invalid: submitted initial walk unavailable")
 				}
-				if err := p.validateInitialProposal(*proposal, &city, true); err != nil {
+				previouslyReleased := p.previouslyReleasedInitial(decision.CityID, decision.RevisionID, revisionInitial)
+				if err := p.validateInitialProposal(*proposal, &city, !previouslyReleased); err != nil {
 					return err
 				}
 			}
