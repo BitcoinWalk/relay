@@ -175,6 +175,9 @@ func (p *organizerPolicy) exportReplicaBundleLocked(cityID, occurrenceID string)
 	if !uuidPattern.MatchString(cityID) {
 		return nil, errors.New("invalid: replica city")
 	}
+	for range p.db.QueryEvents(nostr.Filter{Kinds: []nostr.Kind{eventModerationKind}, Authors: []nostr.PubKey{p.admin}, Tags: nostr.TagMap{"i": []string{cityID}}}, 1) {
+		return nil, errors.New("replication of moderated cities awaits receiver support")
+	}
 	occurrence := p.byID(occurrenceID)
 	if occurrence == nil || occurrence.Kind != 31923 {
 		return nil, errors.New("restricted: occurrence not accepted by source")

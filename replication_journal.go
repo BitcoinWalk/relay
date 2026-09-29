@@ -483,6 +483,22 @@ func (p *organizerPolicy) recoverReplicaJournal(journal *replicaJournal) (int, e
 	if journal == nil {
 		return 0, errors.New("replica journal unavailable")
 	}
+	// Receiver moderation transport is not enabled yet. Never promote a city
+	// with moderation history into a registry that cannot carry its policy.
+	moderationSeen := 0
+	for event := range p.db.QueryEvents(nostr.Filter{Kinds: []nostr.Kind{eventModerationKind}, Authors: []nostr.PubKey{p.admin}}, 10001) {
+		moderationSeen++
+		if moderationSeen > 10000 {
+			return 0, errors.New("moderation history exceeds replication preflight limit")
+		}
+		m, err := parseEventModeration(event)
+		if err != nil {
+			return 0, err
+		}
+		if _, configured := journal.registry.destination(m.CityID); configured {
+			return 0, errors.New("replication of moderated cities awaits receiver support")
+		}
+	}
 	if err := journal.beginReconciliation(); err != nil {
 		journal.setUnhealthy(err)
 		return 0, err

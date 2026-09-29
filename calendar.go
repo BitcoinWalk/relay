@@ -156,6 +156,9 @@ func calendarReference(event nostr.Event, marker string) (string, error) {
 }
 
 func (p *organizerPolicy) checkCalendar(event nostr.Event) error {
+	if err := p.checkPublishingSuspension(event); err != nil {
+		return err
+	}
 	if value, ok := exactCalendarTag(event, "bitcoinwalk"); ok && value == "initial-proposal-v1" {
 		return p.validateInitialProposal(event, nil, true)
 	}
@@ -166,6 +169,9 @@ func (p *organizerPolicy) checkCalendar(event nostr.Event) error {
 }
 
 func (p *organizerPolicy) checkCalendarRead(event nostr.Event) error {
+	if err := p.checkEventVisibility(event); err != nil {
+		return err
+	}
 	if value, ok := exactCalendarTag(event, "bitcoinwalk"); ok && value == "initial-proposal-v1" {
 		cityID := mustCalendarCity(event)
 		if p.currentApproval(cityID) == nil {
