@@ -9,6 +9,9 @@ import (
 )
 
 func moderationEvent(t *testing.T, key nostr.SecretKey, m eventModeration, offset int) nostr.Event {
+	if m.Scope == "organizer" {
+		return workflowEvent(t, key, eventModerationKind, m, nostr.Tags{{"d", "organizer:00000000-0000-4000-8000-" + fmtModerationOffset(offset)}, {"m", moderationKey(m)}, {"status", m.Status}, {"client", "bitcoinwalk.org"}}, offset)
+	}
 	return workflowEvent(t, key, eventModerationKind, m, nostr.Tags{{"d", m.CityID + ":00000000-0000-4000-8000-" + fmtModerationOffset(offset)}, {"i", m.CityID}, {"m", moderationKey(m)}, {"status", m.Status}, {"client", "bitcoinwalk.org"}}, offset)
 }
 func fmtModerationOffset(n int) string { return fmt.Sprintf("%012d", n) }
@@ -90,16 +93,49 @@ func TestEventModerationLifecycle(t *testing.T) {
 		accept(t, relay, moderationEvent(t, admin, suspend, 12+i*3))
 		accept(t, relay, newEvent)
 	}
+	global := eventModeration{Scope: "organizer", Target: creatorPK.Hex(), Status: "suspended", Reason: "Global organizer suspension"}
+	globalDecision := moderationEvent(t, admin, global, 16)
+	// The prior legacy author decision is the migration predecessor.
+	legacy := p.latestOrganizerModeration(creatorPK.Hex())
+	if legacy == nil {
+		t.Fatal("legacy organizer decision not found")
+	}
+	global.Previous = legacy.ID.Hex()
+	globalDecision = moderationEvent(t, admin, global, 16)
+	accept(t, relay, globalDecision)
+	globalWrite := replicatedOccurrence(t, creator, revision, approval, "2026-10-13", 17)
+	deny(t, relay, globalWrite)
+	otherCityWrite := globalWrite
+	otherCityWrite.Tags = make(nostr.Tags, len(globalWrite.Tags))
+	for i, tag := range globalWrite.Tags {
+		otherCityWrite.Tags[i] = append(nostr.Tag(nil), tag...)
+	}
+	for i, tag := range otherCityWrite.Tags {
+		if len(tag) == 2 && tag[0] == "i" {
+			otherCityWrite.Tags[i] = nostr.Tag{"i", cityB}
+		}
+	}
+	otherCityWrite.Sign(creator)
+	if p.checkPublishingSuspension(otherCityWrite) == nil {
+		t.Fatal("global organizer suspension did not apply across cities")
+	}
+	if p.checkCalendarRead(first) != nil {
+		t.Fatal("global organizer suspension hid existing history")
+	}
+	global.Status = "active"
+	global.Previous = globalDecision.ID.Hex()
+	accept(t, relay, moderationEvent(t, admin, global, 18))
+	accept(t, relay, globalWrite)
 	// Cancellation is permanent even after a later visibility decision.
-	deletion := workflowEvent(t, creator, 5, "cancel", nostr.Tags{{"e", first.ID.Hex()}, {"k", "31923"}, {"i", cityA}}, 18)
+	deletion := workflowEvent(t, creator, 5, "cancel", nostr.Tags{{"e", first.ID.Hex()}, {"k", "31923"}, {"i", cityA}}, 22)
 	accept(t, relay, deletion)
 	again := m
 	again.Previous = visible.ID.Hex()
-	hiddenAgain := moderationEvent(t, admin, again, 19)
+	hiddenAgain := moderationEvent(t, admin, again, 23)
 	accept(t, relay, hiddenAgain)
 	again.Status = "visible"
 	again.Previous = hiddenAgain.ID.Hex()
-	accept(t, relay, moderationEvent(t, admin, again, 20))
+	accept(t, relay, moderationEvent(t, admin, again, 24))
 	if p.checkCalendarRead(first) == nil {
 		t.Fatal("unhide resurrected cancellation")
 	}
@@ -113,7 +149,7 @@ func TestEventModerationLifecycle(t *testing.T) {
 	hideSecond := m
 	hideSecond.Target = calendarAddress(second)
 	hideSecond.EventID = second.ID.Hex()
-	accept(t, relay, moderationEvent(t, admin, hideSecond, 21))
+	accept(t, relay, moderationEvent(t, admin, hideSecond, 25))
 	relay.DisableExpirationManager()
 	db.Close()
 	relay, db, err = newRelay(path, nil)
