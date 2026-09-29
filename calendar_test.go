@@ -200,7 +200,7 @@ func TestOrganizerOccurrencePublishingAndModeration(t *testing.T) {
 		start := time.Now().Add(48 * time.Hour).Unix()
 		event := nostr.Event{Kind: 31923, CreatedAt: nostr.Now() + nostr.Timestamp(offset), Content: city.Description, Tags: nostr.Tags{
 			{"d", "123e4567-e89b-42d3-a456-426614174000:2026-09-22"}, {"title", "BitcoinWalk " + city.CityName}, {"summary", "BitcoinWalk in " + city.CityName}, {"image", city.HeroImageURL},
-			{"start", strconv.FormatInt(start, 10)}, {"D", strconv.FormatInt(start/86400, 10)}, {"location", "Outside the library"}, {"location", "1.5,2.5"}, {"t", "bitcoinwalk"}, {"r", city.ChatURL},
+			{"start", strconv.FormatInt(start, 10)}, {"D", strconv.FormatInt(start/86400, 10)}, {"location", "Outside the library"}, {"location", "1.5,2.5"}, {"g", encodeGeohash(1.5, 2.5)}, {"t", "bitcoinwalk"}, {"r", city.ChatURL},
 			{"end", strconv.FormatInt(start+3600, 10)}, {"start_tzid", "UTC"}, {"end_tzid", "UTC"}, {"i", cityA}, {"bitcoinwalk", "occurrence-v1"},
 			{"e", revision.ID.Hex(), "", "city-revision"}, {"e", approval.ID.Hex(), "", "city-approval"},
 		}}
@@ -209,6 +209,14 @@ func TestOrganizerOccurrencePublishingAndModeration(t *testing.T) {
 	}
 	unauthorized := occurrence(stranger, 3)
 	deny(t, relay, unauthorized)
+	badGeohash := occurrence(editor, 3)
+	for i, tag := range badGeohash.Tags {
+		if tag[0] == "g" {
+			badGeohash.Tags[i] = nostr.Tag{"g", "9v6kpvcxh"}
+		}
+	}
+	badGeohash.Sign(editor)
+	deny(t, relay, badGeohash)
 	// BW-56: the inactive replica gate authenticates the forwarding service,
 	// while independently checking the original author's city permission.
 	service := nostr.Generate()
@@ -356,7 +364,7 @@ func TestInitialWalkIsHiddenUntilExactApproval(t *testing.T) {
 	start := time.Now().Add(48 * time.Hour).Truncate(time.Second)
 	proposal := nostr.Event{Kind: 31923, CreatedAt: nostr.Now(), Content: "Test walk", Tags: nostr.Tags{
 		{"d", cityA + ":" + start.Format("2006-01-02")}, {"title", "BitcoinWalk Test City"}, {"summary", "BitcoinWalk in Test City"}, {"image", "https://example.com/image.jpg"},
-		{"start", strconv.FormatInt(start.Unix(), 10)}, {"D", strconv.FormatInt(start.Unix()/86400, 10)}, {"location", "Square"}, {"location", "1,2"}, {"t", "bitcoinwalk"}, {"r", "https://example.com/chat"},
+		{"start", strconv.FormatInt(start.Unix(), 10)}, {"D", strconv.FormatInt(start.Unix()/86400, 10)}, {"location", "Square"}, {"location", "1,2"}, {"g", encodeGeohash(1, 2)}, {"t", "bitcoinwalk"}, {"r", "https://example.com/chat"},
 		{"end", strconv.FormatInt(start.Add(time.Hour).Unix(), 10)}, {"start_tzid", "UTC"}, {"end_tzid", "UTC"}, {"i", cityA}, {"bitcoinwalk", "initial-proposal-v1"},
 	}}
 	proposal.Sign(creator)
@@ -429,6 +437,15 @@ func TestInitialWalkIsHiddenUntilExactApproval(t *testing.T) {
 	accept(t, relay, editApproval)
 	if count() != 2 {
 		t.Fatal("later city-profile approval hid a retained approved occurrence")
+	}
+}
+
+func TestCalendarGeohashEncoding(t *testing.T) {
+	if got := encodeGeohash(30.2672, -97.7431); got != "9v6kpvcxh" {
+		t.Fatalf("Austin geohash = %q", got)
+	}
+	if got := encodeGeohash(35.14332878435158, -90.04102885724478); got != "9ypzzjdhe" {
+		t.Fatalf("Memphis geohash = %q", got)
 	}
 }
 
