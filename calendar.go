@@ -18,6 +18,51 @@ import (
 var managedWalkImagePattern = regexp.MustCompile(`^https://(?:app-staging\.)?bitcoinwalk\.org/api/media/files/[0-9a-f]{64}\.webp$`)
 var allTrailsRoutePattern = regexp.MustCompile(`^https://www\.alltrails\.com/explore/trail/[A-Za-z0-9._~!$&'()*+,;=:@%/-]+(?:\?[A-Za-z0-9._~!$&'()*+,;=:@%/?-]*)?$`)
 
+const geohashAlphabet = "0123456789bcdefghjkmnpqrstuvwxyz"
+
+func encodeGeohash(latitude, longitude float64) string {
+	latRange, lonRange := [2]float64{-90, 90}, [2]float64{-180, 180}
+	even, value, bits, result := true, 0, 0, make([]byte, 0, 9)
+	for len(result) < 9 {
+		rangeValue, coordinate := &latRange, latitude
+		if even {
+			rangeValue, coordinate = &lonRange, longitude
+		}
+		midpoint := (rangeValue[0] + rangeValue[1]) / 2
+		value <<= 1
+		if coordinate >= midpoint {
+			value++
+			rangeValue[0] = midpoint
+		} else {
+			rangeValue[1] = midpoint
+		}
+		even = !even
+		bits++
+		if bits == 5 {
+			result = append(result, geohashAlphabet[value])
+			value, bits = 0, 0
+		}
+	}
+	return string(result)
+}
+
+func validateOptionalGeohash(event nostr.Event, latitude, longitude float64) error {
+	value, count := "", 0
+	for _, tag := range event.Tags {
+		if len(tag) > 0 && tag[0] == "g" {
+			count++
+			if len(tag) != 2 {
+				return errors.New("invalid: calendar geohash")
+			}
+			value = tag[1]
+		}
+	}
+	if count > 1 || count == 1 && value != encodeGeohash(latitude, longitude) {
+		return errors.New("invalid: calendar geohash does not match coordinates")
+	}
+	return nil
+}
+
 func (p *organizerPolicy) guardCalendarReads(relay *khatru.Relay) {
 	query := relay.QueryStored
 	relay.QueryStored = func(ctx context.Context, filter nostr.Filter) iter.Seq[nostr.Event] {
@@ -227,6 +272,7 @@ func (p *organizerPolicy) validateInitialProposal(event nostr.Event, city *cityD
 	for name := range expected {
 		allowed[name] = true
 	}
+	allowed["g"] = true
 	routeMarker, hasRouteMarker := exactCalendarTag(event, "bitcoinwalk-route")
 	if hasRouteMarker {
 		if routeMarker != "alltrails-v1" {
@@ -268,6 +314,9 @@ func (p *organizerPolicy) validateInitialProposal(event nostr.Event, city *cityD
 	lon, x2 := strconv.ParseFloat(coords[1], 64)
 	if x1 != nil || x2 != nil || lat < -90 || lat > 90 || lon < -180 || lon > 180 {
 		return errors.New("invalid: initial walk coordinates")
+	}
+	if err := validateOptionalGeohash(event, lat, lon); err != nil {
+		return err
 	}
 	if city != nil {
 		if locations[0] != city.MeetingPoint.Description || lat != *city.MeetingPoint.Latitude || lon != *city.MeetingPoint.Longitude {
@@ -380,6 +429,10 @@ func (p *organizerPolicy) checkLegacyCalendar(event nostr.Event) error {
 				return errors.New("invalid: link tag")
 			}
 			references = append(references, tag[1])
+		case "g":
+			if len(tag) != 2 {
+				return errors.New("invalid: calendar geohash")
+			}
 		default:
 			if _, ok := expected[tag[0]]; !ok || len(tag) != 2 {
 				return errors.New("restricted: unsupported calendar field")
@@ -397,6 +450,9 @@ func (p *organizerPolicy) checkLegacyCalendar(event nostr.Event) error {
 	lon, e2 := strconv.ParseFloat(coords[1], 64)
 	if e1 != nil || e2 != nil || lat != *city.MeetingPoint.Latitude || lon != *city.MeetingPoint.Longitude {
 		return errors.New("restricted: calendar coordinates differ from approval")
+	}
+	if err := validateOptionalGeohash(event, lat, lon); err != nil {
+		return err
 	}
 	if city.ChatURL != "" {
 		if len(references) != 1 || references[0] != city.ChatURL {
@@ -540,7 +596,7 @@ func (p *organizerPolicy) checkOrganizerCalendar(event nostr.Event, writing bool
 		return errors.New("restricted: occurrence must be within the publication horizon")
 	}
 	locations, references, eCount := []string{}, []string{}, 0
-	allowed := map[string]bool{"d": true, "i": true, "bitcoinwalk": true, "title": true, "summary": true, "start": true, "end": true, "D": true, "start_tzid": true, "end_tzid": true, "t": true}
+	allowed := map[string]bool{"d": true, "i": true, "bitcoinwalk": true, "title": true, "summary": true, "start": true, "end": true, "D": true, "start_tzid": true, "end_tzid": true, "t": true, "g": true}
 	if city.HeroImageURL != "" || hasImageMarker {
 		allowed["image"] = true
 	}
@@ -591,6 +647,9 @@ func (p *organizerPolicy) checkOrganizerCalendar(event nostr.Event, writing bool
 	lon, e2 := strconv.ParseFloat(coords[1], 64)
 	if e1 != nil || e2 != nil || lat < -90 || lat > 90 || lon < -180 || lon > 180 {
 		return errors.New("invalid: occurrence coordinates")
+	}
+	if err := validateOptionalGeohash(event, lat, lon); err != nil {
+		return err
 	}
 	expectedLinks := 0
 	if city.ChatURL != "" {
