@@ -222,7 +222,7 @@ func (p *organizerPolicy) check(ctx context.Context, event nostr.Event) error {
 			return errors.New("restricted: workflow events cannot expire")
 		}
 	}
-	if event.Kind == 30303 || event.Kind == 30304 || event.Kind == contentPageKind || event.Kind == featureFlagsKind || event.Kind == eventModerationKind {
+	if event.Kind == 30303 || event.Kind == 30304 || event.Kind == contentPageKind || event.Kind == featureFlagsKind || event.Kind == eventModerationKind || event.Kind == sponsorshipKind {
 		d, err := uniqueTag(event, "d")
 		if err != nil {
 			return err
@@ -238,6 +238,8 @@ func (p *organizerPolicy) check(ctx context.Context, event nostr.Event) error {
 		return p.checkContent(event)
 	case featureFlagsKind:
 		return p.checkFeatureFlags(event)
+	case sponsorshipKind:
+		return p.checkSponsorship(event)
 	case delegationKind:
 		return p.checkDelegation(event)
 	case delegationAcceptanceKind:

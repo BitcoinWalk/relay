@@ -13,6 +13,8 @@ const featureFlagsID = "bitcoinwalk-feature-flags"
 
 type featureFlags struct {
 	PaidTierRegistration bool   `json:"paidTierRegistration"`
+	FeaturedCityWalks    bool   `json:"featuredCityWalks"`
+	Sponsorships         bool   `json:"sponsorships"`
 	PreviousRevisionID   string `json:"previousRevisionId,omitempty"`
 }
 
