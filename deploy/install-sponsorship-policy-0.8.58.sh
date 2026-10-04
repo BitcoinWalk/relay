@@ -36,8 +36,15 @@ chmod 0644 "$dropin"
 systemctl daemon-reload
 systemctl reset-failed bitcoinwalk-relay.service
 systemctl start bitcoinwalk-relay.service
-systemctl is-active --quiet bitcoinwalk-relay.service
-curl --fail --silent --show-error --max-time 10 http://127.0.0.1:3334/healthz >/dev/null
+ready=false
+for _attempt in $(seq 1 30); do
+ if systemctl is-active --quiet bitcoinwalk-relay.service && curl --fail --silent --max-time 3 http://127.0.0.1:3334/healthz >/dev/null; then
+  ready=true
+  break
+ fi
+ sleep 1
+done
+"$ready" || { systemctl status bitcoinwalk-relay.service --no-pager >&2 || true; exit 1; }
 curl --fail --silent --show-error --max-time 10 -H 'Accept: application/nostr+json' http://127.0.0.1:3334/ | grep -q 'bitcoinwalk-organizers-0.8.58'
 
 accepted=true
