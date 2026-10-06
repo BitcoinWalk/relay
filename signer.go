@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"sync"
@@ -21,7 +22,7 @@ func newSignerRelay() *khatru.Relay {
 	r.Info.Name = env("RELAY_SIGNER_NAME", "BitcoinWalk remote signing transport")
 	r.Info.Description = "Ephemeral NIP-46 transport. Encrypted signing messages are relayed live and never stored."
 	r.Info.SupportedNIPs = []any{1, 11, 46}
-	r.Info.Version = "bitcoinwalk-remote-signer-0.8.61"
+	r.Info.Version = "bitcoinwalk-remote-signer-0.8.62"
 	r.MaxMessageSize = 65536
 	r.WriteWait = 2 * time.Second
 	r.Negentropy = false
@@ -37,6 +38,7 @@ func newSignerRelay() *khatru.Relay {
 		mu.Lock()
 		connections[khatru.GetConnection(ctx).Request] = lease{at: time.Now(), active: true}
 		mu.Unlock()
+		log.Print("NIP-46 connection opened")
 	}
 	r.OnListenerRemoved = func(ws *khatru.WebSocket, _ int, _ string, _ nostr.Filter) {
 		mu.Lock()
@@ -50,6 +52,7 @@ func newSignerRelay() *khatru.Relay {
 		delete(counts, khatru.GetConnection(ctx))
 		delete(connections, khatru.GetConnection(ctx).Request)
 		mu.Unlock()
+		log.Print("NIP-46 connection closed")
 	}
 	r.RejectConnection = func(req *http.Request) bool {
 		if !limits.allow("connect:"+khatru.GetIPFromRequest(req), 30, time.Minute, time.Now()) {
@@ -68,7 +71,7 @@ func newSignerRelay() *khatru.Relay {
 		connections[req] = lease{at: time.Now()}
 		return false
 	}
-	r.OnEvent = func(ctx context.Context, e nostr.Event) (bool, string) {
+	eventPolicy := func(ctx context.Context, e nostr.Event) (bool, string) {
 		if e.Kind != 24133 {
 			return true, "restricted: signing messages only"
 		}
@@ -90,7 +93,16 @@ func newSignerRelay() *khatru.Relay {
 		}
 		return false, ""
 	}
-	r.OnRequest = func(ctx context.Context, f nostr.Filter) (bool, string) {
+	r.OnEvent = func(ctx context.Context, e nostr.Event) (bool, string) {
+		reject, reason := eventPolicy(ctx, e)
+		if reject {
+			log.Printf("NIP-46 event rejected: %s", reason)
+		} else {
+			log.Print("NIP-46 event accepted")
+		}
+		return reject, reason
+	}
+	requestPolicy := func(ctx context.Context, f nostr.Filter) (bool, string) {
 		if len(f.Kinds) != 1 || f.Kinds[0] != 24133 || len(f.Tags) != 1 || len(f.Tags["p"]) != 1 {
 			return true, "restricted: one signing recipient required"
 		}
@@ -105,6 +117,15 @@ func newSignerRelay() *khatru.Relay {
 		}
 		counts[khatru.GetConnection(ctx)]++
 		return false, ""
+	}
+	r.OnRequest = func(ctx context.Context, f nostr.Filter) (bool, string) {
+		reject, reason := requestPolicy(ctx, f)
+		if reject {
+			log.Printf("NIP-46 subscription rejected: %s", reason)
+		} else {
+			log.Print("NIP-46 subscription accepted")
+		}
+		return reject, reason
 	}
 	r.Router().HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprintln(w, `{"status":"ok","mode":"ephemeral-remote-signer"}`)
