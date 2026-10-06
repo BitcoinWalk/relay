@@ -1,0 +1,6 @@
+5ae7b69452f70ef85e55dd10fccd02f87ecf1cd6eb537b8181d34657a5b468df  bitcoinwalk-relay-replica-moderation-0.8.63
+1c934640f5933dcaaa3b447d152980d2ebc22077a62f9f94711aa545ce5b753f  replica-audit-shadow-0.8.44
+162ff743574549a9cffe9f5fcc71622e5fa8e8b0c61699333a90cbd48e0eeb5d  deploy/Dockerfile.replica-moderation-0.8.63
+b786b33557f3d7b48c5acf14041306fd7cd19f063f75b7f3c802356a03882925  deploy/compose.replica-candidate-0.8.63.yaml
+bb7e329b3d6138e9dd5b09b71eef40ecc9b2ed19df612dbb195dc596c15e747d  deploy/upgrade-replica-candidate-moderation-0.8.63.sh
+dd484708612fd3b38cec302fd175acec8daf616fd3f197d6b5a5ca18e14e7c43  deploy/install-replica-moderation-source-0.8.63.sh
