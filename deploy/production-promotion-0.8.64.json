@@ -1,0 +1,89 @@
+{
+  "version": 1,
+  "cities": [
+    {
+      "cityId": "032d98ea-f5da-4826-95bd-c4cf9286716e",
+      "slug": "warszawa",
+      "tier": "free",
+      "revisionId": "a628e865af4179525ccbfec221ba4efd2cfe39422d446bde1be4e7cca30cae02",
+      "approvalId": "3705cc04ea393f16ba98bc0cec45a8b2f48347af605633235817b693790f61c8"
+    },
+    {
+      "cityId": "16024b26-3bdd-4e4a-9f0d-59ce1cbb816c",
+      "slug": "hamburg",
+      "tier": "free",
+      "revisionId": "df003ebb17a409e06f06fe230b00d83f5aec7c15adebf41109324d2c0acf77de",
+      "approvalId": "bce30d52318fe5c1e7e4b38f2b24b3fa847e5083260dc19fb69d00e3ef65e24c"
+    },
+    {
+      "cityId": "173639b0-0d24-4bf0-91e1-e659b27d157c",
+      "slug": "koeln",
+      "tier": "free",
+      "revisionId": "c9e6b0768de679e0c523bbf1bb3f3fd28338158dd4ed65ac1f7615700529ff1e",
+      "approvalId": "013d2ed7098df667612f5c15381db8fe284be4e0d01f98f0875b735bbdbbebb2"
+    },
+    {
+      "cityId": "4d22223f-18f4-4ca2-89ea-2d929c3a084d",
+      "slug": "piaseczno",
+      "tier": "free",
+      "revisionId": "591a026c24f1473beaf2b294b2e1540e27af1797e84472f44f6c07a8506c9ed6",
+      "approvalId": "183fce6a1027157b116cd62a88699a0dbeaa4dbce1eb3e07a2ed398b3573f8ba"
+    },
+    {
+      "cityId": "7ffc04f0-3bfc-4dd4-9614-6533853a580d",
+      "slug": "burgas",
+      "tier": "free",
+      "revisionId": "e245877ea66d1c398e41b94dbfa058c3d27be542d358721ccbc07873f08a968f",
+      "approvalId": "8389e0d7ac4e7435097cb5b29a3ded2faa54cce59ef4d9846a5e815f3b780ae5"
+    },
+    {
+      "cityId": "afa33272-bc41-4a09-b0d3-2c5463d3161b",
+      "slug": "manchester",
+      "tier": "free",
+      "revisionId": "bab8d8a02d00288242b622a62d76aac3b2c743ad38049421bb7a137f5a46ed77",
+      "approvalId": "84cd9ab67dfa71af4813c03f267b5d6c2ccdcd71e4c2ade0d8e686e5950fbb91"
+    },
+    {
+      "cityId": "ca2f9905-fb4d-4948-a12c-c792b28ec7c8",
+      "slug": "london",
+      "tier": "paid",
+      "revisionId": "c48745e367ea12c9c62ca0410dba97f6268fe383963d0258012af1ac39f8355a",
+      "approvalId": "0f56d3652b39373c0e9e2817dcbf3f38a2eab04109b01c76dade5798f2446d8f"
+    },
+    {
+      "cityId": "d336673e-f18e-415c-b501-70d7bf19a32b",
+      "slug": "barcelona",
+      "tier": "free",
+      "revisionId": "d1476289421aa43f2fd854b3c396d4584b6a0d0b7d181eb2c5f9758c2fcfe61e",
+      "approvalId": "f39528ba482868e2afef75f456ddb8a9ce01f11a0af4e8a7558205a73d805fec"
+    },
+    {
+      "cityId": "d7d1cda8-7a58-42ad-ab60-c4bad61dab9a",
+      "slug": "bangkok",
+      "tier": "free",
+      "revisionId": "324b388db4d1f8f1fdf114593668f6819b9602bd05380891220bf928480202d2",
+      "approvalId": "c43bc99acb9d0bfc278221232ae6b2cca1d2c2d33061cd234aed0d85f46edccc"
+    },
+    {
+      "cityId": "dbee87ae-f7ac-4292-8895-296cc13bcab7",
+      "slug": "augsburg",
+      "tier": "free",
+      "revisionId": "a17cf42f2273ee6b3e376d5318a1efdcfec66c732f7b5415eb6aefbd4107a8a1",
+      "approvalId": "05ef733860a02205934de229bb1c273b3067be437ef5a08b0782c22b594cb6d9"
+    },
+    {
+      "cityId": "ee04ad84-9375-48a0-9243-05193474181b",
+      "slug": "munich",
+      "tier": "free",
+      "revisionId": "4ca39fb8ffaff59b2b0a0882bd8e0cedb609514eb563d9239dc1e5ba3e5b3bc7",
+      "approvalId": "970823e1e531de02312ee228cb20fc23811d52efc37143a6eba4fd7292dff077"
+    },
+    {
+      "cityId": "fcd7ed35-bea1-420f-90f9-64aeaddf0d2d",
+      "slug": "austin",
+      "tier": "free",
+      "revisionId": "b95fdab15546d6d4a0085c0a7502d607fbc2f2db8589895270ee161d8f0670ba",
+      "approvalId": "89da1a8185937799a9afa091461bc91f5de5ea662e2006404f5bde6d114263cc"
+    }
+  ]
+}

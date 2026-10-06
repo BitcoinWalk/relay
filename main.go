@@ -124,6 +124,9 @@ func newRelay(dbPath string, writers map[nostr.PubKey]bool) (*khatru.Relay, *bol
 }
 
 func run() error {
+	if productionPromotionConfigured() {
+		return runProductionPromotion()
+	}
 	if zone := os.Getenv("RELAY_TIMEZONE_PROBE"); zone != "" {
 		location, err := time.LoadLocation(zone)
 		if err != nil || location.String() != zone {
