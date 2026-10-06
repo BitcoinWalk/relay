@@ -13,8 +13,11 @@ receiver_binary=/opt/bitcoinwalk-replica-rehearsal/bitcoinwalk-relay
 source_dropin=/etc/systemd/system/bitcoinwalk-relay.service.d/90-bw08-version.conf
 receiver_dropin=/etc/systemd/system/bitcoinwalk-replica-rehearsal.service.d/90-bw08-version.conf
 city=be8514a4-9df0-4159-a517-71f65761cbbe
-source=wss://relay-staging.bitcoinwalk.org/
-receiver=wss://replica-staging.bitcoinwalk.org/
+# Audit the two co-located services directly. Public TLS is intentionally not
+# part of this state-preservation gate because its rate limiter can return 429
+# even while both relay services and their databases are healthy.
+source=ws://127.0.0.1:3334
+receiver=ws://127.0.0.1:3341
 
 verify_report(){
  python3 - "$1" <<'PY'
