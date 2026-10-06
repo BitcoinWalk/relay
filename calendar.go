@@ -185,7 +185,7 @@ func (p *organizerPolicy) checkCalendarRead(event nostr.Event) error {
 				return errors.New("restricted: city approval history exceeds the safe read limit")
 			}
 			var decision cityDecision
-			if json.Unmarshal([]byte(approval.Content), &decision) != nil || decision.CityID != cityID || decision.Status != "approved" || decision.InitialEventID != event.ID.Hex() {
+			if json.Unmarshal([]byte(approval.Content), &decision) != nil || decision.CityID != cityID || decision.Status != "approved" || !slices.Contains(decisionInitialIDs(decision), event.ID.Hex()) {
 				continue
 			}
 			candidate := p.byID(decision.RevisionID)
@@ -247,8 +247,18 @@ func (p *organizerPolicy) validateInitialProposal(event nostr.Event, city *cityD
 		if city.HeroImageURL != "" {
 			expected["image"] = city.HeroImageURL
 		}
-		cityStart, _ := time.Parse(time.RFC3339, city.StartAt)
-		if city.CityID != cityID || cityStart.Unix() != start || event.Content != city.Description {
+		starts := city.InitialWalkStarts
+		if len(starts) == 0 {
+			starts = []string{city.StartAt}
+		}
+		matchedStart := false
+		for _, value := range starts {
+			parsed, _ := time.Parse(time.RFC3339, value)
+			if parsed.Unix() == start {
+				matchedStart = true
+			}
+		}
+		if city.CityID != cityID || !matchedStart || event.Content != city.Description {
 			return errors.New("restricted: initial walk differs from city submission")
 		}
 	} else {

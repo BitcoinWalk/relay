@@ -151,8 +151,8 @@ func validateReplicaBundle(ctx context.Context, data []byte, scope replicaScope,
 	required := map[string]bool{grant.CreatorRevisionID: true, decision.RevisionID: true, approval.ID.Hex(): true, bundle.OccurrenceID: true}
 	_, grantEvent, _ := policy.grant(scope.CityID)
 	required[grantEvent.ID.Hex()] = true
-	if decision.InitialEventID != "" {
-		required[decision.InitialEventID] = true
+	for _, id := range decisionInitialIDs(decision) {
+		required[id] = true
 	}
 	for id := range seen {
 		if !required[id] {
@@ -221,8 +221,8 @@ func (p *organizerPolicy) exportReplicaBundleLocked(cityID, occurrenceID string)
 		}
 	}
 	// Include only an initial walk explicitly released by this exact approval.
-	if decision.InitialEventID != "" {
-		initial := p.byID(decision.InitialEventID)
+	for _, initialID := range decisionInitialIDs(decision) {
+		initial := p.byID(initialID)
 		if initial == nil {
 			return nil, errors.New("invalid: released initial walk missing")
 		}

@@ -26,6 +26,7 @@ type sponsorship struct {
 	Mode               string           `json:"mode"`
 	SponsorPubkey      string           `json:"sponsorPubkey,omitempty"`
 	Website            string           `json:"website,omitempty"`
+	LogoHash           string           `json:"logoHash,omitempty"`
 	StartsAt           *int64           `json:"startsAt,omitempty"`
 	EndsAt             *int64           `json:"endsAt,omitempty"`
 	PreviousRevisionID string           `json:"previousRevisionId,omitempty"`
@@ -52,11 +53,14 @@ func parseSponsorship(event nostr.Event) (sponsorship, error) {
 	if decoder.Decode(&value) != nil || decoder.Decode(new(any)) != io.EOF {
 		return value, errors.New("invalid: sponsorship JSON required")
 	}
-	if value.Version != 1 || !uuidPattern.MatchString(value.Scope.CityID) || (value.Scope.Type != "city" && value.Scope.Type != "walk") || value.Scope.Type == "city" && value.Scope.Address != "" || value.Scope.Type == "walk" && !sizeOK(value.Scope.Address, 1, 512) {
+	if (value.Version != 1 && value.Version != 2) || !uuidPattern.MatchString(value.Scope.CityID) || (value.Scope.Type != "city" && value.Scope.Type != "walk") || value.Scope.Type == "city" && value.Scope.Address != "" || value.Scope.Type == "walk" && !sizeOK(value.Scope.Address, 1, 512) {
 		return value, errors.New("invalid: sponsorship scope")
 	}
 	if value.Mode != "inherit" && value.Mode != "hidden" && value.Mode != "empty" && value.Mode != "sponsor" || value.Scope.Type == "city" && value.Mode == "inherit" {
 		return value, errors.New("invalid: sponsorship mode")
+	}
+	if value.LogoHash != "" && (value.Version != 2 || value.Mode != "sponsor" || !hexKeyPattern.MatchString(value.LogoHash)) {
+		return value, errors.New("invalid: logo approval requires a version 2 sponsor assignment and SHA-256")
 	}
 	if value.Mode == "sponsor" && !hexKeyPattern.MatchString(value.SponsorPubkey) || value.Mode != "sponsor" && (value.SponsorPubkey != "" || value.Website != "") || !publicHTTPS(value.Website) {
 		return value, errors.New("invalid: sponsorship details")

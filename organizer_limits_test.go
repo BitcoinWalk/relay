@@ -47,10 +47,11 @@ func TestInitialWalkLimitIgnoresAuthenticationAndExactRetransmission(t *testing.
 		accept(t, relay, proposal)
 	}
 
-	accept(t, relay, initialWalkForLimitTest(t, creator, 1))
-	accept(t, relay, initialWalkForLimitTest(t, creator, 2))
-	fourth := initialWalkForLimitTest(t, creator, 3)
-	if _, err := relay.AddEvent(authCtx(t, fourth), fourth); err == nil || !strings.Contains(err.Error(), "initial walk submission limit") {
-		t.Fatalf("fourth distinct proposal should be rate-limited, got %v", err)
+	for offset := 1; offset < 8; offset++ {
+		accept(t, relay, initialWalkForLimitTest(t, creator, offset))
+	}
+	ninth := initialWalkForLimitTest(t, creator, 8)
+	if _, err := relay.AddEvent(authCtx(t, ninth), ninth); err == nil || !strings.Contains(err.Error(), "initial walk submission limit") {
+		t.Fatalf("ninth distinct proposal should be rate-limited, got %v", err)
 	}
 }
