@@ -170,6 +170,9 @@ func run() error {
 	if os.Getenv("RELAY_REPLICA_SHADOW_CITY") != "" {
 		return runReplicaShadowBackfill()
 	}
+	if os.Getenv("RELAY_REPLICA_VISIBLE_SEED_CITY") != "" {
+		return runReplicaVisibleSeed()
+	}
 	if os.Getenv("RELAY_REPLICA_REPLAY_EVENT") != "" {
 		return runReplicaReplay()
 	}

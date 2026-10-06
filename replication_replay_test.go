@@ -209,6 +209,61 @@ func TestReplicaShadowBackfillFailsClosedBeforeDelivery(t *testing.T) {
 	}
 }
 
+func TestReplicaVisibleSeedIsReadOnlyAndSelectsOnlyPublicRows(t *testing.T) {
+	path, visible := replayJournalFixture(t, "retry")
+	db, err := bbolt.Open(path, 0600, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	historical := visible
+	historical.Event = nostr.Event{Kind: 31923, Content: "hidden historical occurrence", Tags: nostr.Tags{{"i", cityA}, {"bitcoinwalk", "occurrence-v1"}}}
+	historical.Event.Sign(nostr.Generate())
+	historical.OccurrenceID = historical.Event.ID.Hex()
+	historical.SourceSequence = 8
+	putReplayRow(t, db, replicaOutboxRow{EventID: historical.OccurrenceID, CityID: cityA, Destination: historical.Destination, SourceSequence: historical.SourceSequence, Status: "pending", Envelope: &historical})
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	called := 0
+	transport := func(_ context.Context, destination string, envelope replicaDeliveryEnvelope) (replicaDeliveryAck, error) {
+		called++
+		if destination != visible.Destination || envelope.OccurrenceID != visible.OccurrenceID {
+			t.Fatalf("visible seed delivered historical or wrong-scope data: %q %#v", destination, envelope)
+		}
+		return replicaDeliveryAck{EventID: envelope.OccurrenceID, SourceSequence: envelope.SourceSequence, Accepted: true}, nil
+	}
+	result, err := visibleSeedReplica(t.Context(), path, "", cityA, visible.Destination, []string{visible.OccurrenceID}, replicaVisibleSeedConfirmation, transport)
+	if err != nil || result.Delivered != 1 || result.JournalMode != "read-only" || called != 1 {
+		t.Fatalf("visible seed failed: %#v calls=%d err=%v", result, called, err)
+	}
+	after, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(before, after) {
+		t.Fatal("visible seed changed the isolated journal")
+	}
+}
+
+func TestReplicaVisibleSeedFailsClosedBeforeDelivery(t *testing.T) {
+	path, envelope := replayJournalFixture(t, "pending")
+	called := false
+	transport := func(context.Context, string, replicaDeliveryEnvelope) (replicaDeliveryAck, error) {
+		called = true
+		return replicaDeliveryAck{}, nil
+	}
+	if _, err := visibleSeedReplica(t.Context(), path, "", cityA, envelope.Destination, []string{envelope.OccurrenceID}, "wrong", transport); err == nil || called {
+		t.Fatal("visible seed accepted the wrong confirmation")
+	}
+	if _, err := visibleSeedReplica(t.Context(), path, "", cityA, envelope.Destination, []string{"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"}, replicaVisibleSeedConfirmation, transport); err == nil || called {
+		t.Fatal("visible seed delivered without every exact public occurrence")
+	}
+}
+
 func TestReplicaShadowPublicSnapshotRequiresExactAcceptedState(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "snapshot.json")
 	document := `{"cityId":"` + cityA + `","readOnly":true,"source":{"occurrenceIds":["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],"allSignaturesValid":true,"privateWrapperCount":0},"replica":{"occurrenceIds":["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],"allSignaturesValid":true,"privateWrapperCount":0},"exactEventIds":true}`
