@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -16,9 +18,10 @@ import (
 // pubkey can observe its encrypted envelopes. Only the endpoints decrypt them.
 func newSignerRelay() *khatru.Relay {
 	r := khatru.NewRelay()
-	r.Info.Name = "BitcoinWalk signing transport staging"
+	r.Info.Name = env("RELAY_SIGNER_NAME", "BitcoinWalk remote signing transport")
+	r.Info.Description = "Ephemeral NIP-46 transport. Encrypted signing messages are relayed live and never stored."
 	r.Info.SupportedNIPs = []any{1, 11, 46}
-	r.Info.Version = "bitcoinwalk-signer-0.1.0"
+	r.Info.Version = "bitcoinwalk-remote-signer-0.8.61"
 	r.MaxMessageSize = 65536
 	r.WriteWait = 2 * time.Second
 	r.Negentropy = false
@@ -104,14 +107,85 @@ func newSignerRelay() *khatru.Relay {
 		return false, ""
 	}
 	r.Router().HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
-		fmt.Fprintln(w, `{"status":"ok","mode":"ephemeral-signer-staging"}`)
+		fmt.Fprintln(w, `{"status":"ok","mode":"ephemeral-remote-signer"}`)
 	})
 	return r
 }
 
-func runSignerStaging() error {
+func runSignerTransport(mode string) error {
+	if mode != "staging" && mode != "remote" {
+		return errors.New("RELAY_SIGNER_MODE must be staging or remote")
+	}
+	listen := "127.0.0.1:3336"
+	serviceURL := "wss://chat-staging.bitcoinwalk.org/signer"
+	if mode == "remote" {
+		listen = "127.0.0.1:3344"
+		serviceURL = "wss://remote.bitcoinwalk.org/"
+	}
+	listen = env("RELAY_SIGNER_LISTEN", listen)
+	if err := validateListenAddress(listen, false); err != nil {
+		return err
+	}
 	r := newSignerRelay()
-	r.ServiceURL = "wss://chat-staging.bitcoinwalk.org/signer"
-	server := &http.Server{Addr: "127.0.0.1:3336", Handler: r, ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16384}
+	r.ServiceURL = env("RELAY_SIGNER_SERVICE_URL", serviceURL)
+	server := &http.Server{Addr: listen, Handler: r, ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16384}
 	return server.ListenAndServe()
+}
+
+func runSignerAcceptance(target string) error {
+	if !strings.HasPrefix(target, "wss://") {
+		return errors.New("signer acceptance requires a wss URL")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	sender, err := nostr.RelayConnect(ctx, target, nostr.RelayOptions{})
+	if err != nil {
+		return fmt.Errorf("connect sender: %w", err)
+	}
+	defer sender.Close()
+	receiver, err := nostr.RelayConnect(ctx, target, nostr.RelayOptions{})
+	if err != nil {
+		return fmt.Errorf("connect receiver: %w", err)
+	}
+	defer receiver.Close()
+	senderKey := nostr.Generate()
+	recipient := nostr.GetPublicKey(nostr.Generate()).Hex()
+	filter := nostr.Filter{Kinds: []nostr.Kind{24133}, Tags: nostr.TagMap{"p": []string{recipient}}}
+	sub, err := receiver.Subscribe(ctx, filter, nostr.SubscriptionOptions{})
+	if err != nil {
+		return fmt.Errorf("subscribe: %w", err)
+	}
+	defer sub.Unsub()
+	select {
+	case <-sub.EndOfStoredEvents:
+	case <-ctx.Done():
+		return errors.New("signer acceptance did not receive EOSE")
+	}
+	event := nostr.Event{Kind: 24133, CreatedAt: nostr.Now(), Tags: nostr.Tags{{"p", recipient}}, Content: "bitcoinwalk remote signer acceptance"}
+	event.Sign(senderKey)
+	if err := sender.Publish(ctx, event); err != nil {
+		return fmt.Errorf("publish: %w", err)
+	}
+	select {
+	case got := <-sub.Events:
+		if got.ID != event.ID {
+			return errors.New("signer acceptance received the wrong live event")
+		}
+	case <-ctx.Done():
+		return errors.New("signer acceptance live delivery timed out")
+	}
+	late, err := receiver.Subscribe(ctx, filter, nostr.SubscriptionOptions{})
+	if err != nil {
+		return fmt.Errorf("late subscribe: %w", err)
+	}
+	defer late.Unsub()
+	select {
+	case <-late.Events:
+		return errors.New("signer acceptance found persisted history")
+	case <-late.EndOfStoredEvents:
+	case <-ctx.Done():
+		return errors.New("signer acceptance history check timed out")
+	}
+	fmt.Printf("ephemeral NIP-46 delivery accepted at %s\n", target)
+	return nil
 }

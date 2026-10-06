@@ -101,3 +101,13 @@ func TestSignerRejectsInvalidEnvelopesAndBroadReads(t *testing.T) {
 		t.Fatal("broad read accepted")
 	}
 }
+
+func TestSignerTransportModeValidation(t *testing.T) {
+	if err := runSignerTransport("invalid"); err == nil || !strings.Contains(err.Error(), "must be staging or remote") {
+		t.Fatalf("unexpected mode validation: %v", err)
+	}
+	t.Setenv("RELAY_SIGNER_LISTEN", "0.0.0.0:3344")
+	if err := runSignerTransport("remote"); err == nil || !strings.Contains(err.Error(), "loopback") {
+		t.Fatalf("unexpected listen validation: %v", err)
+	}
+}

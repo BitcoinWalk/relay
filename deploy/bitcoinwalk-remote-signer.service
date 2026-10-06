@@ -1,0 +1,43 @@
+[Unit]
+Description=BitcoinWalk isolated ephemeral NIP-46 transport
+After=network.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+DynamicUser=yes
+ExecStart=/opt/bitcoinwalk-remote-signer/bitcoinwalk-remote-signer
+Environment=RELAY_SIGNER_MODE=remote
+Environment=RELAY_SIGNER_LISTEN=127.0.0.1:3344
+Environment=RELAY_SIGNER_SERVICE_URL=wss://remote.bitcoinwalk.org/
+Environment="RELAY_SIGNER_NAME=BitcoinWalk remote signing transport"
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=10
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectKernelLogs=yes
+ProtectProc=invisible
+ProcSubset=pid
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+MemoryDenyWriteExecute=yes
+MemoryMax=128M
+TasksMax=64
+LimitNOFILE=1024
+
+[Install]
+WantedBy=multi-user.target

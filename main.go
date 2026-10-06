@@ -181,8 +181,11 @@ func run() error {
 		fmt.Println(pubkey.Hex())
 		return nil
 	}
-	if os.Getenv("RELAY_SIGNER_MODE") == "staging" {
-		return runSignerStaging()
+	if target := os.Getenv("RELAY_SIGNER_ACCEPTANCE_URL"); target != "" {
+		return runSignerAcceptance(target)
+	}
+	if mode := os.Getenv("RELAY_SIGNER_MODE"); mode != "" {
+		return runSignerTransport(mode)
 	}
 	if path := os.Getenv("RELAY_CHAT_KEY_INIT"); path != "" {
 		return createRelayCredential(path)

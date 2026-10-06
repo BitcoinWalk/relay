@@ -1,0 +1,4 @@
+97f3a6983283f9dcf97be9d4b97b419b2e4b021121fba3a72c942924157c373f  bitcoinwalk-relay-remote-signer-0.8.61
+76edf1f100408acab102e2be3827673840e90628f84b6827fd22f651b686ea3d  deploy/bitcoinwalk-remote-signer.service
+4ef3f0742199c883b050021ba930b37480b33f38db419530a9aba157815294d0  deploy/Caddyfile.remote-signer
+3ca2afbc2d0966de804cc90cfb61dfcbc22c9477250f2a22a544d3d306881c6d  deploy/install-remote-signer-0.8.61.sh

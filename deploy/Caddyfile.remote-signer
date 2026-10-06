@@ -1,0 +1,13 @@
+
+# Isolated ephemeral NIP-46 transport. This is not a general-purpose relay.
+remote.bitcoinwalk.org {
+	request_body {
+		max_size 64KB
+	}
+	reverse_proxy 127.0.0.1:3344 {
+		header_up X-Forwarded-For {http.request.remote.host}
+		header_up X-Forwarded-Host remote.bitcoinwalk.org
+		header_up X-Forwarded-Proto https
+		header_up -Forwarded
+	}
+}
