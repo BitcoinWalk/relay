@@ -45,3 +45,36 @@ func TestSponsorshipAuthorityValidationAndSuccessor(t *testing.T) {
 	accept(t, relay, second)
 	accept(t, relay, second)
 }
+
+func TestSponsorshipLogoVersionBinding(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		version    int
+		mode, hash string
+		valid      bool
+	}{
+		{"legacy", 1, "sponsor", "", true},
+		{"approved", 2, "sponsor", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", true},
+		{"removed", 2, "sponsor", "", true},
+		{"legacy-logo", 1, "sponsor", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", false},
+		{"hidden-logo", 2, "hidden", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", false},
+		{"url", 2, "sponsor", "https://example.com/logo.png", false},
+		{"unknown-version", 3, "sponsor", "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			event := sponsorshipEvent(t, nostr.Generate(), tc.mode, "", 0)
+			var value sponsorship
+			if err := json.Unmarshal([]byte(event.Content), &value); err != nil {
+				t.Fatal(err)
+			}
+			value.Version = tc.version
+			value.LogoHash = tc.hash
+			body, _ := json.Marshal(value)
+			event.Content = string(body)
+			_, err := parseSponsorship(event)
+			if (err == nil) != tc.valid {
+				t.Fatalf("valid=%v error=%v", tc.valid, err)
+			}
+		})
+	}
+}

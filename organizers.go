@@ -29,13 +29,14 @@ func workflowAddress(d, cityID string) bool {
 }
 
 type cityDraft struct {
-	CityID       string   `json:"cityId"`
-	Slug         string   `json:"slug"`
-	CityName     string   `json:"cityName"`
-	Aliases      []string `json:"aliases,omitempty"`
-	StartAt      string   `json:"startAt"`
-	Description  string   `json:"description"`
-	MeetingPoint struct {
+	CityID            string   `json:"cityId"`
+	Slug              string   `json:"slug"`
+	CityName          string   `json:"cityName"`
+	Aliases           []string `json:"aliases,omitempty"`
+	StartAt           string   `json:"startAt"`
+	InitialWalkStarts []string `json:"initialWalkStarts,omitempty"`
+	Description       string   `json:"description"`
+	MeetingPoint      struct {
 		Description string   `json:"description"`
 		Latitude    *float64 `json:"latitude"`
 		Longitude   *float64 `json:"longitude"`
@@ -55,13 +56,24 @@ type cityGrant struct {
 	CreatorRevisionID string   `json:"creatorRevisionId"`
 }
 type cityDecision struct {
-	CityID         string `json:"cityId"`
-	RevisionID     string `json:"cityRevisionId"`
-	InitialEventID string `json:"initialEventId,omitempty"`
-	HeroImageURL   string `json:"heroImageUrl,omitempty"`
-	Slug           string `json:"slug,omitempty"`
-	Status         string `json:"status"`
-	Note           string `json:"note"`
+	CityID          string   `json:"cityId"`
+	RevisionID      string   `json:"cityRevisionId"`
+	InitialEventID  string   `json:"initialEventId,omitempty"`
+	InitialEventIDs []string `json:"initialEventIds,omitempty"`
+	HeroImageURL    string   `json:"heroImageUrl,omitempty"`
+	Slug            string   `json:"slug,omitempty"`
+	Status          string   `json:"status"`
+	Note            string   `json:"note"`
+}
+
+func decisionInitialIDs(decision cityDecision) []string {
+	if len(decision.InitialEventIDs) > 0 {
+		return decision.InitialEventIDs
+	}
+	if decision.InitialEventID != "" {
+		return []string{decision.InitialEventID}
+	}
+	return nil
 }
 
 type organizerPolicy struct {
@@ -191,7 +203,7 @@ func (p *organizerPolicy) previouslyReleasedInitial(cityID, revisionID, initialI
 			return false
 		}
 		var decision cityDecision
-		if json.Unmarshal([]byte(event.Content), &decision) == nil && decision.Status == "approved" && decision.CityID == cityID && decision.RevisionID == revisionID && decision.InitialEventID == initialID && event.CheckID() && event.VerifySignature() {
+		if json.Unmarshal([]byte(event.Content), &decision) == nil && decision.Status == "approved" && decision.CityID == cityID && decision.RevisionID == revisionID && slices.Contains(decisionInitialIDs(decision), initialID) && event.CheckID() && event.VerifySignature() {
 			return true
 		}
 	}
@@ -269,22 +281,29 @@ func (p *organizerPolicy) check(ctx context.Context, event nostr.Event) error {
 		if grant == nil && p.hasOtherPendingCity(event.PubKey, city.CityID) {
 			return errors.New("rate-limited: this identity already has a city awaiting review")
 		}
-		initialID, initialCount := "", 0
+		initialIDs := []string{}
 		for _, tag := range event.Tags {
 			if len(tag) == 4 && tag[0] == "e" && tag[2] == "" && tag[3] == "initial-walk" {
-				initialID, initialCount = tag[1], initialCount+1
+				initialIDs = append(initialIDs, tag[1])
 			}
 		}
-		if initialCount > 0 {
-			if initialCount != 1 || grant != nil {
+		if len(initialIDs) > 0 {
+			if len(initialIDs) > 8 || grant != nil {
 				return errors.New("invalid: initial walk is only allowed on a new city submission")
 			}
-			proposal := p.byID(initialID)
-			if proposal == nil || proposal.Kind != 31923 || proposal.PubKey != event.PubKey {
-				return errors.New("invalid: organizer-signed initial walk not found")
-			}
-			if err := p.validateInitialProposal(*proposal, &city, true); err != nil {
-				return err
+			seen := map[string]bool{}
+			for _, initialID := range initialIDs {
+				if seen[initialID] {
+					return errors.New("invalid: duplicate initial walk")
+				}
+				seen[initialID] = true
+				proposal := p.byID(initialID)
+				if proposal == nil || proposal.Kind != 31923 || proposal.PubKey != event.PubKey {
+					return errors.New("invalid: organizer-signed initial walk not found")
+				}
+				if err := p.validateInitialProposal(*proposal, &city, true); err != nil {
+					return err
+				}
 			}
 		}
 		// No grant means a pending proposal, not ownership or public approval.
@@ -381,20 +400,20 @@ func (p *organizerPolicy) check(ctx context.Context, event nostr.Event) error {
 			}
 		}
 		matched := 0
-		initialTag := ""
-		initialTags := 0
+		initialTags := []string{}
 		for _, tag := range event.Tags {
 			if len(tag) > 3 && tag[0] == "e" && tag[3] == "city-revision" && tag[1] == decision.RevisionID {
 				matched++
 			}
 			if len(tag) > 3 && tag[0] == "e" && tag[2] == "" && tag[3] == "initial-walk" {
-				initialTag, initialTags = tag[1], initialTags+1
+				initialTags = append(initialTags, tag[1])
 			}
 		}
 		if matched != 1 {
 			return errors.New("invalid: approval must reference the exact city revision")
 		}
-		if (decision.InitialEventID == "") != (initialTags == 0) || initialTags > 1 || initialTag != decision.InitialEventID {
+		decisionIDs := decisionInitialIDs(decision)
+		if len(decisionIDs) > 8 || len(initialTags) != len(decisionIDs) || !slices.Equal(initialTags, decisionIDs) {
 			return errors.New("invalid: decision initial-walk reference mismatch")
 		}
 		previous := p.latestDecision(decision.CityID)
@@ -415,23 +434,25 @@ func (p *organizerPolicy) check(ctx context.Context, event nostr.Event) error {
 			return errors.New("invalid: approval city does not match revision")
 		}
 		if status == "approved" {
-			revisionInitial, count := "", 0
+			revisionInitials := []string{}
 			for _, tag := range revision.Tags {
 				if len(tag) == 4 && tag[0] == "e" && tag[2] == "" && tag[3] == "initial-walk" {
-					revisionInitial, count = tag[1], count+1
+					revisionInitials = append(revisionInitials, tag[1])
 				}
 			}
-			if count > 0 {
-				if count != 1 || decision.InitialEventID != revisionInitial {
+			if len(revisionInitials) > 0 {
+				if !slices.Equal(decisionIDs, revisionInitials) {
 					return errors.New("restricted: approval must release the submitted initial walk")
 				}
-				proposal := p.byID(revisionInitial)
-				if proposal == nil || proposal.Kind != 31923 || proposal.PubKey != revision.PubKey {
-					return errors.New("invalid: submitted initial walk unavailable")
-				}
-				previouslyReleased := p.previouslyReleasedInitial(decision.CityID, decision.RevisionID, revisionInitial)
-				if err := p.validateInitialProposal(*proposal, &city, !previouslyReleased); err != nil {
-					return err
+				for _, revisionInitial := range revisionInitials {
+					proposal := p.byID(revisionInitial)
+					if proposal == nil || proposal.Kind != 31923 || proposal.PubKey != revision.PubKey {
+						return errors.New("invalid: submitted initial walk unavailable")
+					}
+					previouslyReleased := p.previouslyReleasedInitial(decision.CityID, decision.RevisionID, revisionInitial)
+					if err := p.validateInitialProposal(*proposal, &city, !previouslyReleased); err != nil {
+						return err
+					}
 				}
 			}
 			grant, _, err := p.grant(decision.CityID)
@@ -468,7 +489,7 @@ func enableOrganizers(relay *khatru.Relay, db *boltdb.BoltBackend, admin nostr.P
 				return true, "rate-limited: organizer write limit"
 			}
 			if value, ok := exactCalendarTag(event, "bitcoinwalk"); ok && value == "initial-proposal-v1" {
-				if !p.limits.allow("initial-walk:"+event.PubKey.Hex(), 3, 24*time.Hour, now) {
+				if !p.limits.allow("initial-walk:"+event.PubKey.Hex(), 8, 24*time.Hour, now) {
 					return true, "rate-limited: initial walk submission limit"
 				}
 				if ip := khatru.GetIP(ctx); ip != "" && !p.limits.allow("initial-walk-ip:"+ip, 30, 24*time.Hour, now) {

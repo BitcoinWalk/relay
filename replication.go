@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"slices"
 
 	"fiatjaf.com/nostr"
 	"fiatjaf.com/nostr/khatru"
@@ -65,7 +66,7 @@ func (p *organizerPolicy) checkReplicaCalendarTarget(event nostr.Event) error {
 		return errors.New("restricted: initial walk has no current city approval")
 	}
 	var decision cityDecision
-	if json.Unmarshal([]byte(approval.Content), &decision) != nil || decision.InitialEventID != event.ID.Hex() {
+	if json.Unmarshal([]byte(approval.Content), &decision) != nil || !slices.Contains(decisionInitialIDs(decision), event.ID.Hex()) {
 		return errors.New("restricted: initial walk was not released by the current approval")
 	}
 	revision := p.byID(decision.RevisionID)

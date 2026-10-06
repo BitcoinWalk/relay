@@ -459,13 +459,15 @@ func (j *replicaJournal) recordEventLocked(policy *organizerPolicy, event nostr.
 	}
 	if action == "decision" {
 		var decision cityDecision
-		if json.Unmarshal([]byte(event.Content), &decision) == nil && decision.Status == "approved" && decision.InitialEventID != "" {
-			initial := policy.byID(decision.InitialEventID)
-			if initial == nil || initial.Kind != 31923 {
-				return nil, false, errors.New("approved initial walk is unavailable for replication")
-			}
-			if _, _, err := j.recordEventLocked(policy, *initial, recovered); err != nil {
-				return nil, false, err
+		if json.Unmarshal([]byte(event.Content), &decision) == nil && decision.Status == "approved" {
+			for _, initialID := range decisionInitialIDs(decision) {
+				initial := policy.byID(initialID)
+				if initial == nil || initial.Kind != 31923 {
+					return nil, false, errors.New("approved initial walk is unavailable for replication")
+				}
+				if _, _, err := j.recordEventLocked(policy, *initial, recovered); err != nil {
+					return nil, false, err
+				}
 			}
 		}
 	}
