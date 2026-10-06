@@ -47,3 +47,21 @@ func TestProductionPromotionRehearsalCannotInstallCandidate(t *testing.T) {
 		}
 	}
 }
+
+func TestProductionPromotionAcceptanceIsReadOnly(t *testing.T) {
+	data, err := os.ReadFile("deploy/complete-production-promotion-rehearsal-0.8.65.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := string(data)
+	for _, required := range []string{"London is not the sole paid city", "cmp /var/lib/bitcoinwalk-relay-production/events.db", "app-health.accepted.json", "SHA256SUMS.accepted"} {
+		if !strings.Contains(script, required) {
+			t.Fatalf("missing acceptance guard %q", required)
+		}
+	}
+	for _, forbidden := range []string{"systemctl stop", "systemctl restart", "docker", "install -m", "cp -p"} {
+		if strings.Contains(script, forbidden) {
+			t.Fatalf("acceptance script contains mutation %q", forbidden)
+		}
+	}
+}
