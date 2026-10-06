@@ -1,0 +1,5 @@
+6c105a3b7785aa7ed79da9b4f01041d64e275914d3c5d89434a8ad21809d20ad  bitcoinwalk-relay-london-0.8.68
+1c934640f5933dcaaa3b447d152980d2ebc22077a62f9f94711aa545ce5b753f  replica-audit-london-0.8.68
+8c40ae25546e6f6b76db19f053b1485b6f222129418a9fe87c4c7a0188b98bb5  deploy/Dockerfile.london-relay-0.8.68
+28829fd5fe1bef51df1fe41e17f9207185b46097d50322e0d3263cdb65922092  deploy/compose.london-relay-0.8.68.yaml
+a8180ff2544cc79e025cabe3ebfb22ff9b0307d0504eb9eeefc79bf81876226f  deploy/install-london-relay-docker-0.8.68.sh
