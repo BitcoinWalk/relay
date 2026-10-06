@@ -13,6 +13,14 @@ import (
 	"fiatjaf.com/nostr"
 )
 
+func TestReplicaBundleBoundCoversMaximumApprovedSeries(t *testing.T) {
+	// Eight initial walks + creator revision + grant + approved revision +
+	// approval + a later occurrence.
+	if maxReplicaBundleEvents != 13 {
+		t.Fatalf("replica bundle bound %d does not match the signed city workflow", maxReplicaBundleEvents)
+	}
+}
+
 func TestReplicaBundleAllowsRetainedPastOccurrence(t *testing.T) {
 	admin, creator, service := nostr.Generate(), nostr.Generate(), nostr.Generate()
 	adminPK, creatorPK := nostr.GetPublicKey(admin), nostr.GetPublicKey(creator)

@@ -1,0 +1,40 @@
+services:
+  relay:
+    image: bitcoinwalk-relay-london:0.8.71
+    container_name: bitcoinwalk-relay-london
+    init: true
+    restart: unless-stopped
+    read_only: true
+    user: "65532:65532"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 64
+    mem_limit: 512m
+    stop_grace_period: 20s
+    environment:
+      RELAY_LISTEN: 0.0.0.0:3345
+      RELAY_REPLICA_RECEIVER_CONTAINER_LISTEN: "true"
+      RELAY_DB: /data/events.db
+      RELAY_ORGANIZER_MODE: "true"
+      RELAY_REPLICA_RECEIVER_CITY: ca2f9905-fb4d-4948-a12c-c792b28ec7c8
+      RELAY_REPLICA_RECEIVER_SERVICE_PUBKEY: a6c0c0aba1385505e1e1db704934a67d93fac6c5561d8f256e6dcac1df2ed448
+      RELAY_REPLICA_RECEIVER_DESTINATION: wss://london.bitcoinwalk.org/
+      RELAY_NAME: BitcoinWalk London relay
+      RELAY_VERSION: bitcoinwalk-city-relay-0.8.71
+      RELAY_DESCRIPTION: Dedicated London city receiver. Public reads; authenticated city-scoped replication writes only.
+      RELAY_LANDING_TEXT: BitcoinWalk London city relay. Private-network receiver awaiting registry and signed-directory activation.
+    volumes:
+      - /var/lib/bitcoinwalk-relay-london:/data
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=32m,mode=0700,uid=65532,gid=65532
+    expose:
+      - "3345"
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true
+    name: root_my_custom_network

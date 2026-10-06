@@ -25,6 +25,12 @@ type replicaBundle struct {
 	OccurrenceID string        `json:"occurrenceId"`
 }
 
+// A new-city approval may release eight initial walks. A later occurrence then
+// needs those eight walks plus creator revision, grant, approved revision,
+// approval and the occurrence itself. Keep the bound aligned with the signed
+// city workflow limit; the separate 256 KiB wire bound still applies.
+const maxReplicaBundleEvents = 13
+
 // validateReplicaBundle validates in a disposable, unserved database. It does
 // NOT install records in a live relay and cannot establish current source state.
 // A receiver must also check authenticated source ordering and existing
@@ -45,7 +51,7 @@ func validateReplicaBundle(ctx context.Context, data []byte, scope replicaScope,
 	if err := decoder.Decode(new(any)); err != io.EOF {
 		return errors.New("invalid: trailing bundle data")
 	}
-	if bundle.Version != 1 || bundle.CityID != scope.CityID || len(bundle.Events) < 4 || len(bundle.Events) > 6 {
+	if bundle.Version != 1 || bundle.CityID != scope.CityID || len(bundle.Events) < 4 || len(bundle.Events) > maxReplicaBundleEvents {
 		return errors.New("invalid: bundle envelope")
 	}
 	seen := map[string]bool{}
