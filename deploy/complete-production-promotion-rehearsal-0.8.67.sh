@@ -63,7 +63,8 @@ print(f"Validated {len(cities)} cities, {result['eventCount']} signed events and
 PY
 
 production_service=bitcoinwalk-relay-production.service
-production_current=$(mktemp "$evidence/production-current.XXXXXX.db")
+production_current=$(mktemp "$evidence/production-current.XXXXXX")
+production_current_name=$(basename "$production_current")
 production_stopped=0
 recover_production() {
   code=$?
@@ -108,7 +109,7 @@ PY
 
 (
   cd "$evidence"
-  sha256sum staging-source.db production-live.db production-current.*.db production.candidate.db staging-source.logical-digest production-candidate.logical-digest production-live.logical-digest production-current.logical-digest promotion-result.json cities.tsv app-health.before.json app-health.accepted.json nip11-before-restart.json nip11-after-restart.json candidate-start-1.log candidate-start-2.log audit-*.json >SHA256SUMS.accepted
+  sha256sum staging-source.db production-live.db "$production_current_name" production.candidate.db staging-source.logical-digest production-candidate.logical-digest production-live.logical-digest production-current.logical-digest promotion-result.json cities.tsv app-health.before.json app-health.accepted.json nip11-before-restart.json nip11-after-restart.json candidate-start-1.log candidate-start-2.log audit-*.json >SHA256SUMS.accepted
 )
 chmod 0600 "$evidence/SHA256SUMS.accepted" "$health"
 echo "Selective production promotion rehearsal accepted on 0.8.67. Evidence: $evidence"

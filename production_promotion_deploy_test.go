@@ -72,7 +72,7 @@ func TestProductionPromotionStableDigestAcceptanceRecoversService(t *testing.T) 
 		t.Fatal(err)
 	}
 	script := string(data)
-	for _, required := range []string{"production_stopped=0", "recover_production", "systemctl stop \"$production_service\"", "systemctl start \"$production_service\"", "production-current.logical-digest", "cmp \"$evidence/production-live.logical-digest\" \"$evidence/production-current.logical-digest\""} {
+	for _, required := range []string{"production_stopped=0", "recover_production", "production-current.XXXXXX", "systemctl stop \"$production_service\"", "systemctl start \"$production_service\"", "production-current.logical-digest", "cmp \"$evidence/production-live.logical-digest\" \"$evidence/production-current.logical-digest\""} {
 		if !strings.Contains(script, required) {
 			t.Fatalf("missing stable-digest acceptance guard %q", required)
 		}
