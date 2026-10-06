@@ -37,20 +37,14 @@ func TestEventModerationLifecycle(t *testing.T) {
 	second := replicatedOccurrence(t, creator, revision, approval, "2026-10-11", 4)
 	accept(t, relay, second)
 	m := eventModeration{CityID: cityA, Scope: "event", Target: calendarAddress(first), EventID: first.ID.Hex(), Status: "hidden", Reason: "Test moderation"}
-	p.replicaJournal = &replicaJournal{registry: &replicaRegistry{destinations: map[string]string{cityA: "wss://replica.example/"}}}
-	deny(t, relay, moderationEvent(t, admin, m, 5))
-	p.replicaJournal = nil
 	deny(t, relay, moderationEvent(t, other, m, 5))
 	cross := m
 	cross.CityID = cityB
 	deny(t, relay, moderationEvent(t, admin, cross, 5))
 	hidden := moderationEvent(t, admin, m, 5)
 	accept(t, relay, hidden)
-	if _, err := p.exportReplicaBundle(cityA, second.ID.Hex()); err == nil {
-		t.Fatal("moderated city exported without receiver support")
-	}
-	if _, err := p.recoverReplicaJournal(&replicaJournal{registry: &replicaRegistry{destinations: map[string]string{cityA: "wss://replica.example/"}}}); err == nil {
-		t.Fatal("moderated city promoted into replication")
+	if _, err := p.exportReplicaBundle(cityA, second.ID.Hex()); err != nil {
+		t.Fatalf("moderated city occurrence was not exportable: %v", err)
 	}
 	if p.checkCalendarRead(first) == nil || p.checkCalendarRead(second) != nil {
 		t.Fatal("hide did not isolate target")

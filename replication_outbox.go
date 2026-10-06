@@ -177,7 +177,42 @@ func suppressReplicaOutboxEventTx(tx *bbolt.Tx, eventID string, control replicaD
 	}
 	row.RetryAt = 0
 	row.LastCode = "canceled"
-	return putOutboxRow(tx, *row)
+	if err := putOutboxRow(tx, *row); err != nil {
+		return err
+	}
+	return suppressUndeliveredReplicaModerationTx(tx, eventID, "target-canceled")
+}
+
+func suppressUndeliveredReplicaModerationTx(tx *bbolt.Tx, occurrenceID, code string) error {
+	rows := make([]replicaOutboxRow, 0)
+	if err := tx.Bucket(replicaOutboxBucket).ForEach(func(_, data []byte) error {
+		var row replicaOutboxRow
+		if err := json.Unmarshal(data, &row); err != nil {
+			return err
+		}
+		if row.Attempts != 0 || row.Envelope == nil || replicaEnvelopeAction(*row.Envelope) != "moderation" {
+			return nil
+		}
+		moderation, err := parseEventModeration(row.Envelope.Event)
+		if err != nil {
+			return err
+		}
+		if moderation.EventID == occurrenceID {
+			row.Status = "suppressed"
+			row.LastCode = code
+			row.RetryAt = 0
+			rows = append(rows, row)
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	for _, row := range rows {
+		if err := putOutboxRow(tx, row); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func queueReplicaRevocationTx(tx *bbolt.Tx, entry replicaJournalEntry) error {
@@ -203,6 +238,47 @@ func queueReplicaRevocationTx(tx *bbolt.Tx, entry replicaJournalEntry) error {
 	})
 }
 
+func queueReplicaModerationTx(tx *bbolt.Tx, entry replicaJournalEntry) error {
+	moderation, err := parseEventModeration(entry.Event)
+	if err != nil || moderation.Scope != "event" {
+		return errors.New("invalid replica moderation outbox event")
+	}
+	target, found, err := outboxRow(tx, moderation.EventID)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return errors.New("replica moderation target is absent from the outbox")
+	}
+	envelope := replicaControlEnvelope(entry, "moderation", "")
+	if existing, exists, err := outboxRow(tx, entry.EventID); err != nil {
+		return err
+	} else if exists {
+		if existing.CityID != entry.CityID || existing.Destination != entry.Destination || existing.Envelope == nil || !receiverEnvelopeEqual(*existing.Envelope, envelope) {
+			return errors.New("replica moderation outbox conflict")
+		}
+		return nil
+	}
+	// A fresh recovery never sends an occurrence that is already permanently
+	// canceled or revoked. Its later visibility history is therefore irrelevant
+	// at an empty receiver and must not become an undeliverable queue head.
+	if target.Attempts == 0 && (target.Status == "canceled" || target.Status == "revoked" || target.Status == "stale-source") {
+		if tx.Bucket(replicaOutboxBucket).Stats().KeyN >= replicaOutboxLimit {
+			return errors.New("replica outbox capacity exceeded")
+		}
+		return putOutboxRow(tx, replicaOutboxRow{
+			EventID:        entry.EventID,
+			CityID:         entry.CityID,
+			Destination:    entry.Destination,
+			SourceSequence: entry.Sequence,
+			Status:         "suppressed",
+			LastCode:       "target-not-replicated",
+			Envelope:       &envelope,
+		})
+	}
+	return ensureReplicaOutboxTx(tx, entry, &envelope, "")
+}
+
 func suppressReplicaOutboxCityTx(tx *bbolt.Tx, cityID string, control replicaDeliveryEnvelope) (bool, error) {
 	bucket := tx.Bucket(replicaOutboxBucket)
 	rows := make([]replicaOutboxRow, 0)
@@ -221,6 +297,14 @@ func suppressReplicaOutboxCityTx(tx *bbolt.Tx, cityID string, control replicaDel
 	needsStandalone := false
 	for _, row := range rows {
 		if row.Envelope != nil && replicaEnvelopeAction(*row.Envelope) != "occurrence" {
+			if replicaEnvelopeAction(*row.Envelope) == "moderation" && row.Attempts == 0 {
+				row.Status = "suppressed"
+				row.LastCode = "city-revoked"
+				row.RetryAt = 0
+				if err := putOutboxRow(tx, row); err != nil {
+					return false, err
+				}
+			}
 			continue
 		}
 		if row.Status == "acknowledged" || row.Status == "cancellation-required" {
@@ -376,6 +460,8 @@ func (j *replicaJournal) completeOutboxAttempt(attempt replicaOutboxRow, envelop
 			return putOutboxRow(tx, *row)
 		}
 		if action == "occurrence" {
+			row.Status = "retry"
+		} else if action == "moderation" {
 			row.Status = "retry"
 		}
 		row.LastCode = "delivery-failed"

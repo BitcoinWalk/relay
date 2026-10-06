@@ -137,11 +137,6 @@ func (p *organizerPolicy) checkEventModeration(event nostr.Event) error {
 	if err != nil {
 		return err
 	}
-	if p.replicaJournal != nil && m.Scope != "organizer" {
-		if _, configured := p.replicaJournal.registry.destination(m.CityID); configured {
-			return errors.New("restricted: moderation for replicated cities awaits receiver support; nothing changed")
-		}
-	}
 	if stored := p.byID(event.ID.Hex()); stored != nil {
 		return nil
 	} // exact retry cannot replace a newer head

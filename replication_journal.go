@@ -285,6 +285,15 @@ func replicaJournalAction(event nostr.Event) (string, string, bool) {
 			return "", "", false
 		}
 		return "decision", decision.CityID, true
+	case eventModerationKind:
+		moderation, err := parseEventModeration(event)
+		// City/author/organizer suspension governs writes at the authoritative
+		// source. A dedicated city receiver is read-only, so only event visibility
+		// decisions belong in its ordered public-state stream.
+		if err != nil || moderation.Scope != "event" {
+			return "", "", false
+		}
+		return "moderation", moderation.CityID, true
 	default:
 		return "", "", false
 	}
@@ -320,7 +329,11 @@ func (j *replicaJournal) recordEventLocked(policy *organizerPolicy, event nostr.
 		AcceptedAt:  j.now().Unix(),
 		Recovered:   recovered,
 	}
-	if action == "occurrence" && policy.checkCalendarRead(event) == nil {
+	// Replicate the signed base occurrence even when a later moderation decision
+	// currently hides it. Ordered moderation is delivered separately after the
+	// target exists at the receiver. Tombstones, revocations and stale authority
+	// still fail this retained-source check.
+	if action == "occurrence" && policy.checkReplicaCalendarTarget(event) == nil {
 		entry.EligibleAtAcceptance = true
 	}
 	if approval := policy.currentApproval(cityID); approval != nil {
@@ -434,6 +447,11 @@ func (j *replicaJournal) recordEventLocked(policy *organizerPolicy, event nostr.
 				}
 			}
 		}
+		if action == "moderation" {
+			if err := queueReplicaModerationTx(tx, queueEntry); err != nil {
+				return err
+			}
+		}
 		return nil
 	})
 	if err != nil {
@@ -468,8 +486,10 @@ func recoveryActionOrder(action string) int {
 		return 2
 	case "cancellation":
 		return 3
-	default:
+	case "moderation":
 		return 4
+	default:
+		return 5
 	}
 }
 
@@ -483,22 +503,6 @@ func (p *organizerPolicy) recoverReplicaJournal(journal *replicaJournal) (int, e
 	if journal == nil {
 		return 0, errors.New("replica journal unavailable")
 	}
-	// Receiver moderation transport is not enabled yet. Never promote a city
-	// with moderation history into a registry that cannot carry its policy.
-	moderationSeen := 0
-	for event := range p.db.QueryEvents(nostr.Filter{Kinds: []nostr.Kind{eventModerationKind}, Authors: []nostr.PubKey{p.admin}}, 10001) {
-		moderationSeen++
-		if moderationSeen > 10000 {
-			return 0, errors.New("moderation history exceeds replication preflight limit")
-		}
-		m, err := parseEventModeration(event)
-		if err != nil {
-			return 0, err
-		}
-		if _, configured := journal.registry.destination(m.CityID); configured {
-			return 0, errors.New("replication of moderated cities awaits receiver support")
-		}
-	}
 	if err := journal.beginReconciliation(); err != nil {
 		journal.setUnhealthy(err)
 		return 0, err
@@ -506,7 +510,7 @@ func (p *organizerPolicy) recoverReplicaJournal(journal *replicaJournal) (int, e
 	const scanLimit = 100000
 	candidates := make([]nostr.Event, 0)
 	scanned := 0
-	for event := range p.db.QueryEvents(nostr.Filter{Kinds: []nostr.Kind{5, 30302, 30304, 31923}}, scanLimit+1) {
+	for event := range p.db.QueryEvents(nostr.Filter{Kinds: []nostr.Kind{5, 30302, 30304, eventModerationKind, 31923}}, scanLimit+1) {
 		scanned++
 		if scanned > scanLimit {
 			err := errors.New("replica recovery scan limit exceeded")

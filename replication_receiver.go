@@ -133,6 +133,13 @@ func validateReplicaEnvelope(ctx context.Context, envelope replicaDeliveryEnvelo
 		}
 		return nil, nil
 	}
+	if action == "moderation" {
+		moderation, err := parseEventModeration(envelope.Event)
+		if err != nil || envelope.Event.Kind != eventModerationKind || envelope.Event.PubKey != admin || moderation.Scope != "event" || moderation.CityID != scope.CityID || envelope.OccurrenceID != "" || len(envelope.Bundle) != 0 || envelope.CurrentApprovalID != "" || envelope.CurrentGrantID != "" {
+			return nil, errors.New("invalid: replica moderation envelope")
+		}
+		return nil, nil
+	}
 	if action != "occurrence" || envelope.OccurrenceID == "" || envelope.OccurrenceID != envelope.Event.ID.Hex() {
 		return nil, errors.New("invalid: replica delivery action or occurrence")
 	}
@@ -383,12 +390,20 @@ func (r *replicaReceiver) receiveReplicaEnvelope(ctx context.Context, envelope r
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	r.policy.mu.Lock()
+	defer r.policy.mu.Unlock()
+	// Reject a stale or semantically mismatched moderation decision before it
+	// can advance the durable receiver head and block a later valid delivery.
+	if replicaEnvelopeAction(envelope) == "moderation" {
+		err := r.policy.checkEventModeration(envelope.Event)
+		if err != nil {
+			return replicaDeliveryAck{}, err
+		}
+	}
 	record, err := r.stage(envelope)
 	if err != nil {
 		return replicaDeliveryAck{}, err
 	}
-	r.policy.mu.Lock()
-	defer r.policy.mu.Unlock()
 	if record.Status == "installed" {
 		stored := r.policy.byID(replicaEnvelopeAckID(envelope))
 		if stored != nil && stored.ID == envelope.Event.ID && stored.CheckID() && stored.VerifySignature() {
@@ -418,6 +433,10 @@ func (r *replicaReceiver) receiveReplicaEnvelope(ctx context.Context, envelope r
 		}
 		if err := r.saveExact(envelope.Event); err != nil {
 			return replicaDeliveryAck{}, fmt.Errorf("replica revocation install failed: %w", err)
+		}
+	} else if replicaEnvelopeAction(envelope) == "moderation" {
+		if err := r.saveExact(envelope.Event); err != nil {
+			return replicaDeliveryAck{}, fmt.Errorf("replica moderation install failed: %w", err)
 		}
 	} else {
 		for _, event := range replicaInstallOrder(bundle) {

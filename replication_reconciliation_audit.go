@@ -55,7 +55,7 @@ func auditReplicaReconciliation(policy *organizerPolicy, journal *replicaJournal
 	source := map[string]sourceRecord{}
 	const scanLimit = 100000
 	scanned := 0
-	for event := range policy.db.QueryEvents(nostr.Filter{Kinds: []nostr.Kind{5, 30302, 30304, 31923}}, scanLimit+1) {
+	for event := range policy.db.QueryEvents(nostr.Filter{Kinds: []nostr.Kind{5, 30302, 30304, eventModerationKind, 31923}}, scanLimit+1) {
 		scanned++
 		if scanned > scanLimit {
 			return replicaReconciliationReport{}, errors.New("replica reconciliation audit scan limit exceeded")
@@ -121,6 +121,21 @@ func auditReplicaReconciliation(policy *organizerPolicy, journal *replicaJournal
 		}
 		if entry.Action != record.action || entry.CityID != record.cityID || entry.Event.ID != record.event.ID {
 			city.OrphanedRecords++
+		}
+		if record.action == "moderation" {
+			row, rowFound := outbox[eventID]
+			if !rowFound || row.CityID != record.cityID || row.Destination != city.Destination || row.Envelope == nil || replicaEnvelopeAction(*row.Envelope) != "moderation" {
+				city.UnsafeOutboxRows++
+				continue
+			}
+			switch row.Status {
+			case "acknowledged", "suppressed":
+			case "pending", "retry":
+				city.PendingRemovals++
+			default:
+				city.UnsafeOutboxRows++
+			}
+			continue
 		}
 		if record.action != "occurrence" {
 			continue

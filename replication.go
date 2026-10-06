@@ -53,8 +53,8 @@ func (p *organizerPolicy) checkReplicaCalendarTarget(event nostr.Event) error {
 	if marker != "initial-proposal-v1" {
 		return errors.New("restricted: replication requires a released calendar occurrence")
 	}
-	if err := p.checkCalendarRead(event); err != nil {
-		return err
+	if p.calendarDeleted(event.ID.Hex(), event.PubKey) {
+		return errors.New("restricted: calendar event was deleted; publish a new event")
 	}
 	cityID, err := uniqueTag(event, "i")
 	if err != nil {
@@ -67,6 +67,17 @@ func (p *organizerPolicy) checkReplicaCalendarTarget(event nostr.Event) error {
 	var decision cityDecision
 	if json.Unmarshal([]byte(approval.Content), &decision) != nil || decision.InitialEventID != event.ID.Hex() {
 		return errors.New("restricted: initial walk was not released by the current approval")
+	}
+	revision := p.byID(decision.RevisionID)
+	if revision == nil || revision.Kind != 30303 {
+		return errors.New("invalid: released initial walk revision unavailable")
+	}
+	city, err := parseDraft(*revision)
+	if err != nil || city.CityID != cityID {
+		return errors.New("invalid: released initial walk city/revision mismatch")
+	}
+	if err := p.validateInitialProposal(event, &city, false); err != nil {
+		return err
 	}
 	grant, _, err := p.grant(cityID)
 	if err != nil {
