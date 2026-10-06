@@ -65,3 +65,21 @@ func TestProductionPromotionAcceptanceIsReadOnly(t *testing.T) {
 		}
 	}
 }
+
+func TestProductionPromotionStableDigestAcceptanceRecoversService(t *testing.T) {
+	data, err := os.ReadFile("deploy/complete-production-promotion-rehearsal-0.8.67.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := string(data)
+	for _, required := range []string{"production_stopped=0", "recover_production", "systemctl stop \"$production_service\"", "systemctl start \"$production_service\"", "production-current.logical-digest", "cmp \"$evidence/production-live.logical-digest\" \"$evidence/production-current.logical-digest\""} {
+		if !strings.Contains(script, required) {
+			t.Fatalf("missing stable-digest acceptance guard %q", required)
+		}
+	}
+	for _, forbidden := range []string{"install -m", "systemctl reload caddy", "cp -p \"$evidence/production.candidate.db\""} {
+		if strings.Contains(script, forbidden) {
+			t.Fatalf("stable-digest acceptance contains live mutation %q", forbidden)
+		}
+	}
+}
