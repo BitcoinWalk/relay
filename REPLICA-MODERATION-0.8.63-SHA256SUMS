@@ -3,4 +3,4 @@
 162ff743574549a9cffe9f5fcc71622e5fa8e8b0c61699333a90cbd48e0eeb5d  deploy/Dockerfile.replica-moderation-0.8.63
 b786b33557f3d7b48c5acf14041306fd7cd19f063f75b7f3c802356a03882925  deploy/compose.replica-candidate-0.8.63.yaml
 bb7e329b3d6138e9dd5b09b71eef40ecc9b2ed19df612dbb195dc596c15e747d  deploy/upgrade-replica-candidate-moderation-0.8.63.sh
-dd484708612fd3b38cec302fd175acec8daf616fd3f197d6b5a5ca18e14e7c43  deploy/install-replica-moderation-source-0.8.63.sh
+8c4300891eb578a72aaa3ea1fc52bb3e70aae1c0e9c8cc4e087bed3d04c544f8  deploy/install-replica-moderation-staging-0.8.63.sh

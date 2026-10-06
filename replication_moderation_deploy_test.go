@@ -57,27 +57,28 @@ func TestReplicaModerationCandidateUpgradePreservesIsolation(t *testing.T) {
 	}
 }
 
-func TestReplicaModerationSourceUpgradeIsBackupFirstAndNonRoot(t *testing.T) {
-	data, err := os.ReadFile("deploy/install-replica-moderation-source-0.8.63.sh")
+func TestReplicaModerationStagingUpgradeIsBackupFirstAndNonRoot(t *testing.T) {
+	data, err := os.ReadFile("deploy/install-replica-moderation-staging-0.8.63.sh")
 	if err != nil {
 		t.Fatal(err)
 	}
 	script := string(data)
 	for _, required := range []string{
-		`mktemp -d /var/backups/bitcoinwalk-replica-moderation-source.`,
-		`test "$service_user" != root`,
-		`bitcoinwalk-replica-candidate-0.8.63`,
+		`mktemp -d /var/backups/bitcoinwalk-replica-moderation-staging.`,
+		`test -n "$source_user" && test "$source_user" != root`,
+		`test -n "$receiver_user" && test "$receiver_user" != root`,
+		`systemctl stop bitcoinwalk-replica-rehearsal.service`,
 		`systemctl stop bitcoinwalk-relay.service`,
-		`cp -p "/var/lib/bitcoinwalk-relay/$name" "$backup/$name"`,
 		`RELAY_VERSION=bitcoinwalk-organizers-0.8.63`,
-		`cmp "$backup/candidate.before.json" "$backup/candidate.after.json"`,
-		`cmp "$backup/existing.before.json" "$backup/existing.after.json"`,
+		`RELAY_VERSION=bitcoinwalk-replica-rehearsal-0.8.63`,
+		`cmp "$backup/public.before.json" "$backup/public.after.json"`,
+		`cmp "$backup/public.before.json" "$backup/public.after-restart.json"`,
 	} {
 		if !strings.Contains(script, required) {
 			t.Fatalf("source upgrade omitted safety invariant %q", required)
 		}
 	}
-	if strings.Contains(script, "events.db\" \"/var/lib") {
+	if strings.Contains(script, "install -o") && strings.Contains(script, "events.db\" \"/var/lib") {
 		t.Fatal("source upgrade contains an automatic database restore")
 	}
 }
