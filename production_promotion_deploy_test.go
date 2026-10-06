@@ -31,12 +31,12 @@ func TestProductionPromotionManifestHasOnlyLondonPaid(t *testing.T) {
 }
 
 func TestProductionPromotionRehearsalCannotInstallCandidate(t *testing.T) {
-	data, err := os.ReadFile("deploy/rehearse-production-promotion-0.8.64.sh")
+	data, err := os.ReadFile("deploy/rehearse-production-promotion-0.8.66.sh")
 	if err != nil {
 		t.Fatal(err)
 	}
 	script := string(data)
-	for _, required := range []string{"sha256sum -c", "production-live.db", "production.candidate.db", "production-promotion-v1", "-allow-empty", "byte-identical"} {
+	for _, required := range []string{"sha256sum -c", "staging-source.db", "promotion-input.db", "production-live.db", "production.candidate.db", "production-promotion-v1", "-allow-empty", "byte-identical"} {
 		if !strings.Contains(script, required) {
 			t.Fatalf("missing rehearsal guard %q", required)
 		}
@@ -49,12 +49,12 @@ func TestProductionPromotionRehearsalCannotInstallCandidate(t *testing.T) {
 }
 
 func TestProductionPromotionAcceptanceIsReadOnly(t *testing.T) {
-	data, err := os.ReadFile("deploy/complete-production-promotion-rehearsal-0.8.65.sh")
+	data, err := os.ReadFile("deploy/complete-production-promotion-rehearsal-0.8.66.sh")
 	if err != nil {
 		t.Fatal(err)
 	}
 	script := string(data)
-	for _, required := range []string{"London is not the sole paid city", "cmp /var/lib/bitcoinwalk-relay-production/events.db", "app-health.accepted.json", "SHA256SUMS.accepted"} {
+	for _, required := range []string{"London is not the sole paid city", "production-live.db$", "RELAY_REPLICA_DB_DIGEST", "allSignaturesValid", "cmp /var/lib/bitcoinwalk-relay-production/events.db", "app-health.accepted.json", "SHA256SUMS.accepted"} {
 		if !strings.Contains(script, required) {
 			t.Fatalf("missing acceptance guard %q", required)
 		}
