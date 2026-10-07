@@ -4,7 +4,7 @@ test "$(id -u)" -eq 0 || { echo 'Run with sudo.' >&2; exit 1; }
 test "$#" -eq 0 || { echo "Usage: $0" >&2; exit 1; }
 cd "$(dirname "$0")/.."
 
-manifest=DIRECTORY-LONDON-ACTIVATION-0.8.80-SHA256SUMS
+manifest=DIRECTORY-LONDON-ACTIVATION-0.8.81-SHA256SUMS
 artifact=./bitcoinwalk-relay-directory-multicity-0.8.79
 collector=./deploy/capture-city-directory-root-0.8.35.mjs
 old_anchors=./deploy/city-directory-anchors-0.8.34.json
@@ -22,8 +22,9 @@ london=d8909ef6d7f675a28f13a02ddf4e13d083f6dfd519becf97b2c6a4aa63421fb2
 sha256sum -c "$manifest"
 cmp -s "$anchors" "$old_anchors"; cmp -s "$bundle" "$old_bundle"
 test -x "$node"; systemctl is-active --quiet "$service"
+anchors_abs=$(realpath "$new_anchors"); bundle_abs=$(realpath "$new_bundle")
 for city in be8514a4-9df0-4159-a517-71f65761cbbe ca2f9905-fb4d-4948-a12c-c792b28ec7c8; do
- RELAY_CITY_DIRECTORY_AUDIT_ANCHORS="$PWD/$new_anchors" RELAY_CITY_DIRECTORY_AUDIT_BUNDLE="$PWD/$new_bundle" RELAY_CITY_DIRECTORY_AUDIT_CITY="$city" "$artifact" >/dev/null
+ RELAY_CITY_DIRECTORY_AUDIT_ANCHORS="$anchors_abs" RELAY_CITY_DIRECTORY_AUDIT_BUNDLE="$bundle_abs" RELAY_CITY_DIRECTORY_AUDIT_CITY="$city" "$artifact" >/dev/null
 done
 backup=$(mktemp -d /var/backups/bitcoinwalk-directory-london-primary.XXXXXX); chmod 0700 "$backup"
 cp -p "$anchors" "$backup/anchors.before.json"; cp -p "$bundle" "$backup/bundle.before.json"
@@ -57,6 +58,6 @@ for city in memphis london; do cmp "$backup/$city.loopback.before-restart.json" 
 systemctl is-active --quiet "$service"; cp -p "$database" "$backup/events.after.db"
 (cd "$backup" && sha256sum anchors.before.json bundle.before.json events.before.db events.after.db memphis.*.json london.*.json >SHA256SUMS)
 completed=1; trap - EXIT HUP INT TERM
-echo "Primary London directory anchor accepted on 0.8.80. Backup: $backup"
+echo "Primary London directory anchor accepted on 0.8.81. Backup: $backup"
 echo "Memphis remained exact and London is public as $london across restart."
 echo 'No application, Guide, city relay, replica, DNS or Caddy state was changed.'

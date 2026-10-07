@@ -34,7 +34,7 @@ func TestLondonDirectoryActivationArtifacts(t *testing.T) {
 	if err != nil || london.OwnerPubkey != "6534806c21772d8b35daf5570ebc10bf1540360ad792c46e0f48ea3a9b2de65f" || len(london.OperatorPubkeys) != 1 || london.PublicRelays[0].URL != "wss://london.bitcoinwalk.org/" {
 		t.Fatalf("London signed root mismatch: %#v %v", london, err)
 	}
-	for _, path := range []string{"deploy/activate-london-directory-primary-0.8.80.sh", "deploy/activate-london-directory-secondary-0.8.80.sh"} {
+	for _, path := range []string{"deploy/activate-london-directory-primary-0.8.81.sh", "deploy/activate-london-directory-secondary-0.8.81.sh"} {
 		data, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatal(err)

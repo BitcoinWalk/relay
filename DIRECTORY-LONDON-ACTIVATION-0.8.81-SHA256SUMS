@@ -6,5 +6,5 @@
 19066696566da124f69168f6ac59756d7e96a13752a4fcdc068af925abc58839  deploy/city-directory-anchors-0.8.80.json
 60ab47d2bceec34ab9b5aae37af8022edabb73e058a351ef476dfc2015613ca2  deploy/city-directory-london-root-0.8.80.json
 90fa6fcd40affb2e7622e233347e42c39f70045a11b259622bc1464990467c5d  deploy/city-directory-memphis-london-bundle-0.8.80.json
-826af3e2d774eeeea52de6e6ea3159ff44215d7713ce2b39234dd44795a2a7da  deploy/activate-london-directory-primary-0.8.80.sh
-3465f42988a434a9df58e489ed33f9c79349db5398697c52bf836ce5b19346bc  deploy/activate-london-directory-secondary-0.8.80.sh
+7524a0b38f67717138da1b61ea35403fdadf3430201885187830fc01759168b7  deploy/activate-london-directory-primary-0.8.81.sh
+b16dad339062d52ab37c0c03d85a9ce697ce0909d8ac194af9c4b550009b7459  deploy/activate-london-directory-secondary-0.8.81.sh

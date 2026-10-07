@@ -4,7 +4,7 @@ test "$(id -u)" -eq 0 || { echo 'Run as root.' >&2; exit 1; }
 test "$#" -eq 0 || { echo "Usage: $0" >&2; exit 1; }
 cd "$(dirname "$0")/.."
 
-manifest=DIRECTORY-LONDON-ACTIVATION-0.8.80-SHA256SUMS
+manifest=DIRECTORY-LONDON-ACTIVATION-0.8.81-SHA256SUMS
 artifact=./bitcoinwalk-relay-directory-multicity-0.8.79
 collector=./deploy/capture-city-directory-root-0.8.39.py
 old_anchors=./deploy/city-directory-anchors-0.8.34.json
@@ -26,8 +26,9 @@ cmp -s "$anchors" "$old_anchors"; cmp -s "$bundle" "$old_bundle"
 test "$(docker inspect "$container" --format '{{.State.Running}}')" = true
 test "$(docker inspect "$container" --format '{{.Config.Image}}')" = bitcoinwalk-directory-2-staging:0.8.79
 test -z "$(docker port "$container")"
+anchors_abs=$(realpath "$new_anchors"); bundle_abs=$(realpath "$new_bundle")
 for city in be8514a4-9df0-4159-a517-71f65761cbbe ca2f9905-fb4d-4948-a12c-c792b28ec7c8; do
- RELAY_CITY_DIRECTORY_AUDIT_ANCHORS="$PWD/$new_anchors" RELAY_CITY_DIRECTORY_AUDIT_BUNDLE="$PWD/$new_bundle" RELAY_CITY_DIRECTORY_AUDIT_CITY="$city" "$artifact" >/dev/null
+ RELAY_CITY_DIRECTORY_AUDIT_ANCHORS="$anchors_abs" RELAY_CITY_DIRECTORY_AUDIT_BUNDLE="$bundle_abs" RELAY_CITY_DIRECTORY_AUDIT_CITY="$city" "$artifact" >/dev/null
 done
 backup=$(mktemp -d /var/backups/bitcoinwalk-directory-london-secondary.XXXXXX); chmod 0700 "$backup"
 cp -p "$anchors" "$backup/anchors.before.json"; cp -p "$bundle" "$backup/bundle.before.json"; docker inspect "$container" >"$backup/container.before.json"
@@ -66,7 +67,7 @@ test "$(docker inspect "$container" --format '{{.HostConfig.ReadonlyRootfs}}')" 
 test -z "$(docker port "$container")"; cp -p "$database" "$backup/events.after.db"; docker inspect "$container" >"$backup/container.after.json"
 (cd "$backup" && sha256sum anchors.before.json bundle.before.json events.before.db events.after.db container.before.json container.after.json memphis.*.json london.*.json >SHA256SUMS)
 completed=1; trap - EXIT HUP INT TERM
-echo "Secondary London directory anchor accepted on 0.8.80. Backup: $backup"
+echo "Secondary London directory anchor accepted on 0.8.81. Backup: $backup"
 echo "Memphis remained exact and London is public as $london across restart."
 echo 'The container remains non-root, read-only, private-network-only and without a host-published port.'
 echo 'No application, Guide, city relay, replica, DNS or Nginx Proxy Manager state was changed.'
