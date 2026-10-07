@@ -7,7 +7,7 @@ import (
 )
 
 func TestProductionLondonReplicationActivationGuards(t *testing.T) {
-	data, err := os.ReadFile("deploy/activate-production-london-replication-0.8.73.sh")
+	data, err := os.ReadFile("deploy/activate-production-london-replication-0.8.74.sh")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -24,6 +24,8 @@ func TestProductionLondonReplicationActivationGuards(t *testing.T) {
 		"replica delivery acknowledged 8 queued item(s)",
 		"len(state[\"occurrenceIds\"]) != 8",
 		"staging-journal.before.digest",
+		"staging-journal.before.db",
+		"staging-journal.after.db",
 		"production-entitlement-authority-key",
 		"LoadCredential=replica-delivery-key",
 	} {
@@ -34,6 +36,7 @@ func TestProductionLondonReplicationActivationGuards(t *testing.T) {
 	for _, forbidden := range []string{
 		"paymentHash\")\nprint",
 		"/etc/bitcoinwalk-replication/registry.json\" >",
+		"RELAY_REPLICA_JOURNAL_STABLE_DIGEST=\"$staging_journal\"",
 		"systemctl restart caddy",
 		"systemctl reload caddy",
 	} {

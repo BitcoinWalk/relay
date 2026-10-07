@@ -5,7 +5,7 @@ test "$EUID" -eq 0 || { echo 'Run this installer with sudo.' >&2; exit 1; }
 test "$#" -eq 0 || { echo "Usage: $0" >&2; exit 1; }
 root_dir=$(cd "$(dirname "$0")/.." && pwd);cd "$root_dir"
 
-manifest=PRODUCTION-LONDON-REPLICATION-0.8.73-SHA256SUMS
+manifest=PRODUCTION-LONDON-REPLICATION-0.8.74-SHA256SUMS
 artifact="$root_dir/bitcoinwalk-relay-production-london-0.8.73"
 audit="$root_dir/replica-audit-production-london-0.8.73"
 promotion_manifest="$root_dir/deploy/production-promotion-0.8.64.json"
@@ -86,14 +86,11 @@ backup=$(mktemp -d /var/backups/bitcoinwalk-production-london-replication.XXXXXX
 isolated="$backup/isolated";mkdir "$isolated";chmod 0700 "$isolated"
 cp -p "$binary" "$backup/production-binary.before"
 cp -p "$database" "$backup/production-events.before.db"
-cp -p "$staging_registry" "$backup/staging-registry.before.json"
 cp -p "$promotion_manifest" "$backup/production-promotion-manifest.json"
-RELAY_REPLICA_JOURNAL_STABLE_DIGEST="$staging_journal" "$artifact" >"$backup/staging-journal.before.digest"
 systemctl cat "$service" >"$backup/production-service.before.txt"
 curl --fail --silent --show-error --max-time 10 http://127.0.0.1:3338/api/healthz >"$backup/app-health.before.json"
 printf '%s\n' "$expected_evidence" >"$backup/payment-evidence.commitment"
 chmod 0600 "$backup/payment-evidence.commitment"
-echo "Consistent pre-activation production backup created: $backup"
 
 production_stopped=false
 isolated_pid=
@@ -103,6 +100,8 @@ stop_isolated(){
 }
 recover(){
  code=$?;trap - EXIT HUP INT TERM;stop_isolated
+ systemctl reset-failed bitcoinwalk-relay.service >/dev/null 2>&1||true
+ systemctl start bitcoinwalk-relay.service >/dev/null 2>&1||true
  if "$activated";then
   systemctl stop "$service" >/dev/null 2>&1||true
   install -o root -g root -m 0755 "$backup/production-binary.before" "$binary"
@@ -116,6 +115,14 @@ recover(){
  exit "$code"
 }
 trap recover EXIT HUP INT TERM
+
+systemctl stop bitcoinwalk-relay.service
+cp -p "$staging_registry" "$backup/staging-registry.before.json"
+cp -p "$staging_journal" "$backup/staging-journal.before.db"
+systemctl start bitcoinwalk-relay.service
+wait_health http://127.0.0.1:3334/healthz
+RELAY_REPLICA_JOURNAL_STABLE_DIGEST="$backup/staging-journal.before.db" "$artifact" >"$backup/staging-journal.before.digest"
+echo "Consistent pre-activation production and staging-control backup created: $backup"
 
 systemctl stop "$service";production_stopped=true
 cp -p "$database" "$backup/production-events.consistent.db"
@@ -198,10 +205,13 @@ wait_health http://127.0.0.1:3340/healthz
 audit_public "$backup/london.after-restart.json"
 cmp "$backup/london.after.json" "$backup/london.after-restart.json"
 
-sha256sum "$staging_registry" | sed 's#  .*#  staging-registry.json#' >"$backup/staging-registry.after.sha256"
-sha256sum "$backup/staging-registry.before.json" | sed 's#  .*#  staging-registry.json#' >"$backup/staging-registry.before.sha256"
-cmp "$backup/staging-registry.before.sha256" "$backup/staging-registry.after.sha256"
-RELAY_REPLICA_JOURNAL_STABLE_DIGEST="$staging_journal" "$artifact" >"$backup/staging-journal.after.digest"
+systemctl stop bitcoinwalk-relay.service
+cp -p "$staging_registry" "$backup/staging-registry.after.json"
+cp -p "$staging_journal" "$backup/staging-journal.after.db"
+systemctl start bitcoinwalk-relay.service
+wait_health http://127.0.0.1:3334/healthz
+cmp "$backup/staging-registry.before.json" "$backup/staging-registry.after.json"
+RELAY_REPLICA_JOURNAL_STABLE_DIGEST="$backup/staging-journal.after.db" "$artifact" >"$backup/staging-journal.after.digest"
 cmp "$backup/staging-journal.before.digest" "$backup/staging-journal.after.digest"
 curl --fail --silent --show-error --max-time 10 http://127.0.0.1:3338/api/healthz >"$backup/app-health.after.json"
 cmp "$backup/app-health.before.json" "$backup/app-health.after.json"
@@ -210,7 +220,7 @@ systemctl is-active --quiet bitcoinwalk-guide.service
 
 (cd "$backup" && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum >SHA256SUMS)
 trap - EXIT HUP INT TERM
-echo "London production entitlement and registry accepted on 0.8.73. Backup: $backup"
+echo "London production entitlement and registry accepted on 0.8.74. Backup: $backup"
 echo 'London is the sole entitled production replica destination and remained exact 8/8 across source restart.'
 echo 'The raw payment hash was neither printed nor copied; only its domain-separated SHA-256 commitment was retained.'
 echo 'The staging registry, stable staging journal, application, Guide and signed directory chain remained unchanged.'
