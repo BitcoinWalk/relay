@@ -7,7 +7,7 @@ import (
 )
 
 func TestProductionPromotionActivationGuards(t *testing.T) {
-	data, err := os.ReadFile("deploy/activate-production-promotion-0.8.75.sh")
+	data, err := os.ReadFile("deploy/activate-production-promotion-0.8.76.sh")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -18,7 +18,10 @@ func TestProductionPromotionActivationGuards(t *testing.T) {
 		"eventCount\") != 110",
 		"len(report.get(\"freeCities\", [])) != 11",
 		"production-events.before.db",
+		"production-binary.before",
 		"production.candidate.db",
+		"RELAY_VERSION=bitcoinwalk-production-0.8.76",
+		"install -o root -g root -m 0755 \"$artifact\" \"$production_binary\"",
 		"audit_all ws://127.0.0.1:3340",
 		"systemctl restart \"$production_service\"",
 		"test ! -e /etc/bitcoinwalk-replication-production",

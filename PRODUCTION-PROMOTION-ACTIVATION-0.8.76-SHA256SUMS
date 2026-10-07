@@ -1,0 +1,4 @@
+d6ec624b8d3ac9002401df8dc41812a2f74467de559942a2ec9e64e6e2d0f44a  bitcoinwalk-relay-production-promotion-0.8.76
+1c934640f5933dcaaa3b447d152980d2ebc22077a62f9f94711aa545ce5b753f  replica-audit-production-promotion-0.8.76
+d5326b892e4475f48b6303037ecc2fae6b4be779eaec62a0a2bacd3c97e567ad  deploy/production-promotion-0.8.64.json
+e22832f7821d9c7ee6993b99be7af7f2c56ecbdd210c6fbef2dbbbe423a61ef7  deploy/activate-production-promotion-0.8.76.sh

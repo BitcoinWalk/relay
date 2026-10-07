@@ -5,14 +5,16 @@ test "$EUID" -eq 0 || { echo 'Run this installer with sudo.' >&2; exit 1; }
 test "$#" -eq 0 || { echo "Usage: $0" >&2; exit 1; }
 root_dir=$(cd "$(dirname "$0")/.." && pwd);cd "$root_dir"
 
-manifest=PRODUCTION-PROMOTION-ACTIVATION-0.8.75-SHA256SUMS
-artifact="$root_dir/bitcoinwalk-relay-production-promotion-0.8.75"
-audit="$root_dir/replica-audit-production-promotion-0.8.75"
+manifest=PRODUCTION-PROMOTION-ACTIVATION-0.8.76-SHA256SUMS
+artifact="$root_dir/bitcoinwalk-relay-production-promotion-0.8.76"
+audit="$root_dir/replica-audit-production-promotion-0.8.76"
 promotion_manifest="$root_dir/deploy/production-promotion-0.8.64.json"
 source_service=bitcoinwalk-relay.service
 production_service=bitcoinwalk-relay-production.service
 source_db=/var/lib/bitcoinwalk-relay/events.db
 production_db=/var/lib/bitcoinwalk-relay-production/events.db
+production_binary=/opt/bitcoinwalk-relay-production/bitcoinwalk-relay
+version_dropin=/etc/systemd/system/bitcoinwalk-relay-production.service.d/90-production-version.conf
 expected_event_digest=7000b1ac878981235fb75360f3aa9f0c0215e1bfb73e85b2196066853ce8fd4e
 expected_london=ca2f9905-fb4d-4948-a12c-c792b28ec7c8
 port=3361
@@ -53,7 +55,7 @@ PY
 
 sha256sum -c "$manifest"
 for command in curl python3 sha256sum mktemp install systemctl stat;do command -v "$command" >/dev/null;done
-for file in "$artifact" "$audit" "$promotion_manifest" "$source_db" "$production_db";do test -f "$file";done
+for file in "$artifact" "$audit" "$promotion_manifest" "$source_db" "$production_db" "$production_binary";do test -f "$file";done
 test -x "$artifact";test -x "$audit"
 for unit in "$source_service" "$production_service" bitcoinwalk-guide.service;do systemctl is-active --quiet "$unit";done
 curl --fail --silent --show-error --max-time 10 http://127.0.0.1:3338/api/healthz >/dev/null
@@ -76,6 +78,14 @@ recover(){
  if "$activated";then
   systemctl stop "$production_service" >/dev/null 2>&1||true
   install -o "$production_uid" -g "$production_gid" -m 0600 "$backup/production-events.before.db" "$production_db"
+  install -o root -g root -m 0755 "$backup/production-binary.before" "$production_binary"
+  if test -f "$backup/production-version.before";then
+   install -d -o root -g root -m 0755 "$(dirname "$version_dropin")"
+   install -o root -g root -m 0644 "$backup/production-version.before" "$version_dropin"
+  else
+   rm -f "$version_dropin"
+  fi
+  systemctl daemon-reload >/dev/null 2>&1||true
  fi
  systemctl reset-failed "$production_service" >/dev/null 2>&1||true
  systemctl start "$production_service" >/dev/null 2>&1||true
@@ -115,11 +125,20 @@ stop_isolated
 production_uid=$(stat -Lc %u "$production_db");production_gid=$(stat -Lc %g "$production_db")
 systemctl stop "$production_service"
 cp -p "$production_db" "$backup/production-events.before.db"
-install -o "$production_uid" -g "$production_gid" -m 0600 "$backup/production.candidate.db" "$production_db"
+cp -p "$production_binary" "$backup/production-binary.before"
+test ! -f "$version_dropin"||cp -p "$version_dropin" "$backup/production-version.before"
 activated=true
+install -o "$production_uid" -g "$production_gid" -m 0600 "$backup/production.candidate.db" "$production_db"
+install -o root -g root -m 0755 "$artifact" "$production_binary"
+install -d -o root -g root -m 0755 "$(dirname "$version_dropin")"
+printf '[Service]\nEnvironment=RELAY_VERSION=bitcoinwalk-production-0.8.76\n' >"$version_dropin"
+chown root:root "$version_dropin";chmod 0644 "$version_dropin"
+systemctl daemon-reload
 systemctl reset-failed "$production_service"||true
 systemctl start "$production_service"
 wait_health http://127.0.0.1:3340/healthz
+curl --fail --silent --show-error --max-time 10 -H 'Accept: application/nostr+json' http://127.0.0.1:3340/ >"$backup/nip11.after.json"
+grep -q 'bitcoinwalk-production-0.8.76' "$backup/nip11.after.json"
 audit_all ws://127.0.0.1:3340 "$backup/production-audit"
 curl --fail --silent --show-error --max-time 15 -H 'Accept: application/nostr+json' https://relay.bitcoinwalk.org/ >"$backup/public-nip11.json"
 
@@ -132,7 +151,7 @@ for unit in "$source_service" "$production_service" bitcoinwalk-guide.service;do
 (cd "$backup" && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum >SHA256SUMS)
 completed=true
 trap - EXIT HUP INT TERM
-echo "Selective 12-city production promotion accepted on 0.8.75. Backup: $backup"
+echo "Atomic 12-city production promotion accepted on 0.8.76. Backup: $backup"
 echo 'The current staging state matched the rehearsed 110-event digest; London is the sole paid city and eleven cities remain free.'
 echo 'All city occurrence sets remained exact across production restart; the application, Guide, DNS, Caddy and signed directory were unchanged.'
 echo 'Production replication is still disabled; run the separate London entitlement activation next.'
