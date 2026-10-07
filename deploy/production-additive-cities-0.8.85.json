@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "cities": [
+    {
+      "cityId": "91a846c2-b57a-4442-904b-167fb8b98dd6",
+      "slug": "seattle",
+      "tier": "free",
+      "revisionId": "eeadde69adeaffe0cc2a151ad393043a96604794dee93bb0dca433a9118ca9a3",
+      "approvalId": "fd0267ddcefdc489bf873107cd955b2c0868911a13320f8b8783ced2c9332df1"
+    },
+    {
+      "cityId": "a11f3390-9ae9-4e6a-9b54-7464f7f42772",
+      "slug": "hrpelje",
+      "tier": "free",
+      "revisionId": "1b9af140565b911e7ef043e9deb4ccf834d343689f0ac1b8761adafe3088fcc8",
+      "approvalId": "1a36ad1dcb398bf29103571916a9ac979c4c7655bb37aee707e1a7417e194988"
+    }
+  ]
+}

@@ -87,7 +87,11 @@ func TestProductionPromotionFailsClosed(t *testing.T) {
 	if _, err := buildProductionPromotionWithAdmin(source, filepath.Join(dir, "wrong-confirmation.db"), manifest, "yes", nostr.GetPublicKey(admin)); err == nil {
 		t.Fatal("weak confirmation accepted")
 	}
-	bad := productionPromotionManifest{Version: 1, Cities: []productionPromotionCity{{CityID: cityA, Slug: "london", Tier: "paid", RevisionID: events[0].ID.Hex(), ApprovalID: "f" + events[2].ID.Hex()[1:]}}}
+	wrongApproval := "f" + events[2].ID.Hex()[1:]
+	if wrongApproval == events[2].ID.Hex() {
+		wrongApproval = "e" + events[2].ID.Hex()[1:]
+	}
+	bad := productionPromotionManifest{Version: 1, Cities: []productionPromotionCity{{CityID: cityA, Slug: "london", Tier: "paid", RevisionID: events[0].ID.Hex(), ApprovalID: wrongApproval}}}
 	data, _ := json.Marshal(bad)
 	if err := os.WriteFile(manifest, data, 0600); err != nil {
 		t.Fatal(err)

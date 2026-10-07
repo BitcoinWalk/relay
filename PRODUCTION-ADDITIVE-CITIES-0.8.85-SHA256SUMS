@@ -1,0 +1,5 @@
+fccb274ac6157149fa26693019d8028cfcca56f86416dba258b5e905d8a9d296  bitcoinwalk-relay-production-additive-0.8.85
+4096cd82f543d324eb63489a7ef3df1862fec1471c55db77831093a90f958234  replica-audit-production-additive-0.8.85
+08c7cd5bf0f0be108c4f6ce229e522bc8c0d4a09e34781370774b90867f7fce9  deploy/production-additive-cities-0.8.85.json
+d5326b892e4475f48b6303037ecc2fae6b4be779eaec62a0a2bacd3c97e567ad  deploy/production-promotion-0.8.64.json
+6b9e494a617daab5bed052c76b12211f001b65b145f826ca284d243144bb56d8  deploy/promote-missing-production-cities-0.8.85.sh
