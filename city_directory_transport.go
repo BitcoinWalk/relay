@@ -144,7 +144,7 @@ func configureMultiCityDirectoryTransport(relay *khatru.Relay, db *boltdb.BoltBa
 
 	relay.Info.Name = "BitcoinWalk " + mode + " directory relay"
 	relay.Info.Description = "Public read-only discovery with authenticated, authority-checked BitcoinWalk directory updates."
-	relay.Info.Version = "bitcoinwalk-directory-transport-0.8.79"
+	relay.Info.Version = "bitcoinwalk-directory-transport-0.8.84"
 	relay.MaxAuthenticatedClients = 8
 	var admission sync.Mutex
 	relay.OnEvent = func(ctx context.Context, event nostr.Event) (bool, string) {
@@ -157,9 +157,6 @@ func configureMultiCityDirectoryTransport(relay *khatru.Relay, db *boltdb.BoltBa
 		}()
 		if event.Kind != cityDirectoryKind {
 			return true, "restricted: only BitcoinWalk city directory kind 30309 is accepted"
-		}
-		if !khatru.IsAuthed(ctx, event.PubKey) {
-			return true, "auth-required: authenticate as the directory event author"
 		}
 		content, err := decodeCityDirectoryEvent(event)
 		if err != nil {
@@ -176,6 +173,19 @@ func configureMultiCityDirectoryTransport(relay *khatru.Relay, db *boltdb.BoltBa
 		current, err := resolveCityDirectory(currentEvents, anchor)
 		if err != nil {
 			return true, "error: current directory chain is invalid"
+		}
+		authorizedTransport := khatru.IsAuthed(ctx, event.PubKey)
+		if !authorizedTransport {
+			for _, operator := range current.OperatorPubkeys {
+				key, parseErr := nostr.PubKeyFromHex(operator)
+				if parseErr == nil && khatru.IsAuthed(ctx, key) {
+					authorizedTransport = true
+					break
+				}
+			}
+		}
+		if !authorizedTransport {
+			return true, "auth-required: authenticate as the directory event author or a current endpoint operator"
 		}
 		for _, storedEvent := range currentEvents {
 			if storedEvent.ID == event.ID {

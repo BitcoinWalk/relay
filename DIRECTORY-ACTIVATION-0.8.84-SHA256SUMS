@@ -1,0 +1,7 @@
+b9fd8ab3ca172647a3dc54618b1fded150c46850985832b549cc85f4d9bf4863  bitcoinwalk-relay-directory-activation-0.8.84
+5805c75a54e64116f0639f2bf95f0a9316c1038a725a5b90d59c4e4234c15980  deploy/Dockerfile.directory-2-staging
+bd5e73626faf0e6c65e8be91cde126381ccfcfb2644ac180ea432903b327cebb  deploy/compose.directory-2-production-0.8.84.yaml
+5a3584810756b52319e134b22d3060db79330bbda10ca3ab245400c90cdb2b0a  deploy/capture-city-directory-root-0.8.35.mjs
+407be4533ab02ca00668524605253feda3fd6634e7ad8f12e3b6cafec70658bb  deploy/capture-city-directory-root-0.8.39.py
+e1cf8114805e61c58ed39c97c83d62e5ca19c10a2c6670cfe099d5531acc4a78  deploy/upgrade-directory-primary-activation-0.8.84.sh
+72e92993a53737ecba66fc37bf0bc04e79445bb6542ef2976dffb0f41f166be6  deploy/upgrade-directory-secondary-activation-0.8.84.sh

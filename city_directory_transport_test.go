@@ -28,7 +28,7 @@ func directoryTransportFixture(t *testing.T) (string, string, nostr.SecretKey, n
 }
 
 func TestCityDirectoryTransportPublicReadAndAuthenticatedWrite(t *testing.T) {
-	anchors, bundle, _, operator, root, rootContent := directoryTransportFixture(t)
+	anchors, bundle, owner, operator, root, rootContent := directoryTransportFixture(t)
 	relay, db, err := newRelay(filepath.Join(t.TempDir(), "directory.db"), map[nostr.PubKey]bool{root.PubKey: true})
 	if err != nil {
 		t.Fatal(err)
@@ -78,6 +78,45 @@ func TestCityDirectoryTransportPublicReadAndAuthenticatedWrite(t *testing.T) {
 	}
 	if err := writer.Publish(ctx, update); err != nil {
 		t.Fatal(err)
+	}
+	ownerUpdateContent := updateContent
+	ownerUpdateContent.Sequence, ownerUpdateContent.PreviousEventID = 2, update.ID.Hex()
+	ownerUpdate := directoryEvent(t, owner, ownerUpdateContent, 2)
+	if err := writer.Publish(ctx, ownerUpdate); err != nil {
+		t.Fatalf("current endpoint operator could not transport exact owner-signed successor: %v", err)
+	}
+}
+
+func TestCityDirectoryTransportOperatorCanTransportButNotForgeOwnerEvent(t *testing.T) {
+	anchors, bundle, owner, operator, root, rootContent := directoryTransportFixture(t)
+	relay, db, err := newRelay(filepath.Join(t.TempDir(), "directory.db"), map[nostr.PubKey]bool{root.PubKey: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer relay.DisableExpirationManager()
+	defer db.Close()
+	if _, err := configureCityDirectoryTransport(relay, db, anchors, bundle, cityA, "staging"); err != nil {
+		t.Fatal(err)
+	}
+
+	content := rootContent
+	content.Sequence, content.Action, content.PreviousEventID = 1, "update", root.ID.Hex()
+	ownerUpdate := directoryEvent(t, owner, content, 1)
+	if _, err := relay.AddEvent(khatru.ForceSetAuthed(context.Background(), nostr.GetPublicKey(operator)), ownerUpdate); err != nil {
+		t.Fatalf("operator transport rejected exact owner event: %v", err)
+	}
+
+	forged := directoryEvent(t, operator, content, 2)
+	if _, err := relay.AddEvent(khatru.ForceSetAuthed(context.Background(), nostr.GetPublicKey(operator)), forged); err == nil || !strings.Contains(err.Error(), "authorized next") {
+		t.Fatalf("operator-forged owner update was not rejected: %v", err)
+	}
+
+	outsider := nostr.Generate()
+	nextContent := content
+	nextContent.Sequence, nextContent.PreviousEventID = 2, ownerUpdate.ID.Hex()
+	nextOwnerUpdate := directoryEvent(t, owner, nextContent, 3)
+	if _, err := relay.AddEvent(khatru.ForceSetAuthed(context.Background(), nostr.GetPublicKey(outsider)), nextOwnerUpdate); err == nil || !strings.Contains(err.Error(), "auth-required") {
+		t.Fatalf("outsider transported an owner event: %v", err)
 	}
 }
 
