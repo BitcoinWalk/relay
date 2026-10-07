@@ -205,3 +205,108 @@ func TestCityDirectoryTransportSerializesCompetingSuccessors(t *testing.T) {
 		t.Fatalf("serialized chain is invalid: %#v %v", state, err)
 	}
 }
+
+func multiCityDirectoryTransportFixture(t *testing.T) (string, string, map[string]nostr.SecretKey, map[string]nostr.Event, map[string]cityDirectoryContent) {
+	t.Helper()
+	dir := t.TempDir()
+	anchorsPath := filepath.Join(dir, "anchors.json")
+	bundlePath := filepath.Join(dir, "bundle.json")
+	owners := map[string]nostr.SecretKey{}
+	roots := map[string]nostr.Event{}
+	contents := map[string]cityDirectoryContent{}
+	anchors := make([]cityDirectoryAnchor, 0, 2)
+	bundle := make([]nostr.Event, 0, 2)
+	for index, cityID := range []string{cityA, cityB} {
+		owner, recovery := nostr.Generate(), nostr.Generate()
+		ownerPK, recoveryPK := nostr.GetPublicKey(owner), nostr.GetPublicKey(recovery)
+		content := directoryContent(cityID, 0, "establish", "", ownerPK, nil, []nostr.PubKey{recoveryPK}, []cityPublicRelay{{URL: "wss://city" + string(rune('a'+index)) + ".example/", Role: "primary"}})
+		root := directoryEvent(t, owner, content, index)
+		owners[cityID], roots[cityID], contents[cityID] = owner, root, content
+		anchors = append(anchors, cityDirectoryAnchor{CityID: cityID, RootEventID: root.ID.Hex(), InitialOwnerPubkey: ownerPK.Hex()})
+		bundle = append(bundle, root)
+	}
+	writeDirectoryJSON(t, anchorsPath, cityDirectoryAnchorFile{Version: 1, Cities: anchors})
+	writeDirectoryJSON(t, bundlePath, cityDirectoryMirrorFile{Version: 1, Events: bundle})
+	return anchorsPath, bundlePath, owners, roots, contents
+}
+
+func TestMultiCityDirectoryTransportResolvesAndUpdatesCitiesIndependently(t *testing.T) {
+	anchors, bundle, owners, roots, contents := multiCityDirectoryTransportFixture(t)
+	dbPath := filepath.Join(t.TempDir(), "directory.db")
+	relay, db, err := newRelay(dbPath, map[nostr.PubKey]bool{nostr.GetPublicKey(owners[cityA]): true, nostr.GetPublicKey(owners[cityB]): true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	states, err := configureMultiCityDirectoryTransport(relay, db, anchors, bundle, nil, "staging")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(states) != 2 || states[cityA].CurrentEventID != roots[cityA].ID.Hex() || states[cityB].CurrentEventID != roots[cityB].ID.Hex() {
+		t.Fatalf("unexpected initial multi-city states: %#v", states)
+	}
+
+	content := contents[cityB]
+	content.Sequence, content.Action, content.PreviousEventID = 1, "update", roots[cityB].ID.Hex()
+	content.PublicRelays = []cityPublicRelay{{URL: "wss://cityb-new.example/", Role: "primary"}}
+	update := directoryEvent(t, owners[cityB], content, 3)
+	if _, err := relay.AddEvent(khatru.ForceSetAuthed(context.Background(), update.PubKey), update); err != nil {
+		t.Fatal(err)
+	}
+	relay.DisableExpirationManager()
+	db.Close()
+
+	restarted, reopened, err := newRelay(dbPath, map[nostr.PubKey]bool{nostr.GetPublicKey(owners[cityA]): true, nostr.GetPublicKey(owners[cityB]): true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer restarted.DisableExpirationManager()
+	defer reopened.Close()
+	states, err = configureMultiCityDirectoryTransport(restarted, reopened, anchors, bundle, nil, "staging")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if states[cityA].Sequence != 0 || states[cityA].ChainLength != 1 || states[cityB].Sequence != 1 || states[cityB].ChainLength != 2 || states[cityB].CurrentEventID != update.ID.Hex() {
+		t.Fatalf("multi-city chains did not survive independently: %#v", states)
+	}
+}
+
+func TestMultiCityDirectoryTransportRejectsUnanchoredWritesAndStorage(t *testing.T) {
+	anchors, bundle, owners, _, _ := multiCityDirectoryTransportFixture(t)
+	relay, db, err := newRelay(filepath.Join(t.TempDir(), "directory.db"), map[nostr.PubKey]bool{nostr.GetPublicKey(owners[cityA]): true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer relay.DisableExpirationManager()
+	defer db.Close()
+	if _, err := configureMultiCityDirectoryTransport(relay, db, anchors, bundle, nil, "staging"); err != nil {
+		t.Fatal(err)
+	}
+	foreignOwner, recovery := nostr.Generate(), nostr.Generate()
+	foreignContent := directoryContent("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", 0, "establish", "", nostr.GetPublicKey(foreignOwner), nil, []nostr.PubKey{nostr.GetPublicKey(recovery)}, []cityPublicRelay{{URL: "wss://foreign.example/", Role: "primary"}})
+	foreign := directoryEvent(t, foreignOwner, foreignContent, 4)
+	if _, err := relay.AddEvent(khatru.ForceSetAuthed(context.Background(), foreign.PubKey), foreign); err == nil || !strings.Contains(err.Error(), "trusted anchor") {
+		t.Fatalf("unanchored event was accepted: %v", err)
+	}
+	if err := db.SaveEvent(foreign); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := loadAllCityDirectoryTransportEvents(db, map[string]cityDirectoryAnchor{cityA: {CityID: cityA}}); err == nil || !strings.Contains(err.Error(), "unanchored") {
+		t.Fatalf("unanchored stored event was accepted: %v", err)
+	}
+}
+
+func TestMultiCityDirectoryTransportRequiresBundleRootForEveryAnchor(t *testing.T) {
+	anchorsPath, _, _, roots, _ := multiCityDirectoryTransportFixture(t)
+	dir := t.TempDir()
+	bundlePath := filepath.Join(dir, "incomplete.json")
+	writeDirectoryJSON(t, bundlePath, cityDirectoryMirrorFile{Version: 1, Events: []nostr.Event{roots[cityA]}})
+	relay, db, err := newRelay(filepath.Join(dir, "directory.db"), map[nostr.PubKey]bool{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer relay.DisableExpirationManager()
+	defer db.Close()
+	if _, err := configureMultiCityDirectoryTransport(relay, db, anchorsPath, bundlePath, nil, "staging"); err == nil || !strings.Contains(err.Error(), cityB) {
+		t.Fatalf("incomplete multi-city bundle was accepted: %v", err)
+	}
+}

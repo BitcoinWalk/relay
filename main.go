@@ -271,14 +271,18 @@ func run() error {
 		anchorPath := os.Getenv("RELAY_CITY_DIRECTORY_TRANSPORT_ANCHORS")
 		bundlePath := os.Getenv("RELAY_CITY_DIRECTORY_TRANSPORT_BUNDLE")
 		cityID := os.Getenv("RELAY_CITY_DIRECTORY_TRANSPORT_CITY")
-		if anchorPath == "" || bundlePath == "" || cityID == "" {
-			return errors.New("city directory transport requires anchors, bundle and city")
+		if anchorPath == "" || bundlePath == "" {
+			return errors.New("city directory transport requires anchors and bundle")
 		}
-		state, err := configureCityDirectoryTransport(relay, db, anchorPath, bundlePath, cityID, directoryTransportMode)
+		selectedCityIDs := []string(nil)
+		if cityID != "" {
+			selectedCityIDs = []string{cityID}
+		}
+		states, err := configureMultiCityDirectoryTransport(relay, db, anchorPath, bundlePath, selectedCityIDs, directoryTransportMode)
 		if err != nil {
 			return fmt.Errorf("configure city directory transport: %w", err)
 		}
-		log.Printf("City directory %s transport enabled for %s at sequence %d", directoryTransportMode, cityID, state.Sequence)
+		log.Printf("City directory %s transport enabled for %d anchored city chain(s)", directoryTransportMode, len(states))
 	}
 	var journal *replicaJournal
 	var organizer *organizerPolicy
