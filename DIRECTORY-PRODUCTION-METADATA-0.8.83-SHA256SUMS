@@ -1,6 +1,6 @@
 f1d9d9071c09e50f022a1719a430753bef639e8e3ec3456297c410dc351cc40c  deploy/90-directory-production.conf
 e22ce954308425f4e4ccf06cf10ea8c8434eea94d32aed65161419ae2865c67d  deploy/activate-directory-primary-production-metadata-0.8.83.sh
 f59bf2f6b8bf6b0481ffcf02c9ed1dcb61a230920e763210147b8ae24513d05d  deploy/compose.directory-2-production-0.8.83.yaml
-d9d63cdd2b2af8cedba3a8783067e4b345278867b38f04670650e59d3296d637  deploy/activate-directory-secondary-production-metadata-0.8.83.sh
+82600ddebaec0c2abb33570ac8f37f139e3032696ae2256a4f4ad2542f89bfc0  deploy/activate-directory-secondary-production-metadata-0.8.83.sh
 5a3584810756b52319e134b22d3060db79330bbda10ca3ab245400c90cdb2b0a  deploy/capture-city-directory-root-0.8.35.mjs
 407be4533ab02ca00668524605253feda3fd6634e7ad8f12e3b6cafec70658bb  deploy/capture-city-directory-root-0.8.39.py
