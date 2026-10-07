@@ -15,10 +15,22 @@ with SHA-256 manifests.
 - Durable bbolt event storage with the upstream eventstore adapter.
 - Unauthenticated public Nostr reads (subject to query limits).
 - NIP-42 write authentication matching the event author, plus an explicit writer allowlist. Initially only the BitcoinWalk super-admin is allowed.
-- Allowed kinds: 0, 5, 30301, 30302, 30303, 30304, 31923. This is an initial restricted staging policy, not city-level authorization; whitelisted writers can write every allowed kind.
+- The base allowlist accepts kinds 0, 5, 30301, 30302, 30303, 30304 and 31923. Organizer mode replaces that broad writer check with the application policy, including its additional strictly validated workflow kinds.
 - Upstream rate policies, 64 KiB WebSocket message limit, bounded queries, health check, NIP-11 metadata.
 - Loopback-only binding, non-root systemd service with filesystem protection and 512 MiB memory limit.
 - Tests for writer restrictions, NIP-42 authentication, invalid signatures, public WebSocket reads, persistence after reopening storage, health endpoint and NIP-11.
+
+### Official city identity bindings
+
+Organizer mode admits BitcoinWalk-specific kind `30312` records only through the
+city identity policy. The event must be signed by the configured super-admin and
+use the exact canonical JSON and ordered tags defined by the web contract. The
+relay retains every sequence address, requires an existing city and current city
+approval for activation or replacement, rejects suspended cities, stale
+predecessors, forks and same-key replacement, and keeps exact retries
+idempotent. Revocation remains available after approval or eligibility is lost
+so an already-published identity can always be withdrawn. Private organizer and
+city-signer proof events are not admitted.
 
 ## Build and test
 
