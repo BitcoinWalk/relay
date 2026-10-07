@@ -1,0 +1,5 @@
+e7273c2a7c42afbbeacb74e0c8f8e6eda9c291a69ba2cd0a6965f4c5cc219236  bitcoinwalk-relay-production-london-0.8.78
+1c934640f5933dcaaa3b447d152980d2ebc22077a62f9f94711aa545ce5b753f  replica-audit-production-london-0.8.78
+aea0712fcc7472f3cdb17fd60f076a38b965e6718620683edd01840f2d98656c  deploy/40-production-london-replication-0.8.77.conf
+f929f2e1c4003cdd0e2b79e58737c22388c735ee036b45adb146e6ed768c742f  deploy/95-production-london-version-0.8.78.conf
+02a0c81b0b94a8bef4af71a70875e760479bd6a4a745ec5834e7da5de1a83a3a  deploy/resume-production-london-replication-0.8.78.sh

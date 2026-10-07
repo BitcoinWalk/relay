@@ -185,6 +185,14 @@ func run() error {
 	if os.Getenv("RELAY_REPLICA_ALERT_REHEARSAL_EVENT") != "" {
 		return runReplicaAlertRehearsalArm()
 	}
+	if path := os.Getenv("RELAY_REPLICA_KEY_PUBLIC"); path != "" {
+		key, err := loadReplicaServiceKey(path)
+		if err != nil {
+			return err
+		}
+		fmt.Println(nostr.GetPublicKey(key).Hex())
+		return nil
+	}
 	if path := os.Getenv("RELAY_REPLICA_KEY_INIT"); path != "" {
 		pubkey, err := initializeReplicaServiceKey(path)
 		if err != nil {
