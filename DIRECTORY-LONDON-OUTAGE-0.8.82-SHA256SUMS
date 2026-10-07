@@ -1,0 +1,4 @@
+5a3584810756b52319e134b22d3060db79330bbda10ca3ab245400c90cdb2b0a  deploy/capture-city-directory-root-0.8.35.mjs
+19066696566da124f69168f6ac59756d7e96a13752a4fcdc068af925abc58839  deploy/city-directory-anchors-0.8.80.json
+90fa6fcd40affb2e7622e233347e42c39f70045a11b259622bc1464990467c5d  deploy/city-directory-memphis-london-bundle-0.8.80.json
+c32c554b96bcaf381cd770eaea1572c859c4f73720895850163bf6feaf8069c6  deploy/rehearse-directory-primary-outage-0.8.82.sh
