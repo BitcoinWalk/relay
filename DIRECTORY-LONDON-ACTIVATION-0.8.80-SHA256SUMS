@@ -1,0 +1,10 @@
+014c3c9529c3272f8a9cef2fc01abae647988e2a00b8324c1c08b6480697a721  bitcoinwalk-relay-directory-multicity-0.8.79
+5a3584810756b52319e134b22d3060db79330bbda10ca3ab245400c90cdb2b0a  deploy/capture-city-directory-root-0.8.35.mjs
+407be4533ab02ca00668524605253feda3fd6634e7ad8f12e3b6cafec70658bb  deploy/capture-city-directory-root-0.8.39.py
+5619413ba16489f6c3e150d65383ab2f536dfc414758cc706a2cfbaec3835b4e  deploy/city-directory-anchors-0.8.34.json
+312bc3c3359b4a4bd3035613417f49ae7cfb3784c0f657791656e75e92e56861  deploy/city-directory-memphis-root-0.8.34.json
+19066696566da124f69168f6ac59756d7e96a13752a4fcdc068af925abc58839  deploy/city-directory-anchors-0.8.80.json
+60ab47d2bceec34ab9b5aae37af8022edabb73e058a351ef476dfc2015613ca2  deploy/city-directory-london-root-0.8.80.json
+90fa6fcd40affb2e7622e233347e42c39f70045a11b259622bc1464990467c5d  deploy/city-directory-memphis-london-bundle-0.8.80.json
+826af3e2d774eeeea52de6e6ea3159ff44215d7713ce2b39234dd44795a2a7da  deploy/activate-london-directory-primary-0.8.80.sh
+3465f42988a434a9df58e489ed33f9c79349db5398697c52bf836ce5b19346bc  deploy/activate-london-directory-secondary-0.8.80.sh
