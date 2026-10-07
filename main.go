@@ -144,6 +144,12 @@ func run() error {
 	if replicaStagingEntitlementIssueConfigured() {
 		return runReplicaStagingEntitlementIssue()
 	}
+	if replicaProductionEntitlementIssueConfigured() {
+		return runReplicaProductionEntitlementIssue()
+	}
+	if replicaEntitlementBootstrapConfigured() {
+		return runReplicaEntitlementBootstrap()
+	}
 	if replicaEntitlementApplyConfigured() {
 		return runReplicaEntitlementApply()
 	}
