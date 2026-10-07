@@ -7,7 +7,7 @@ import (
 )
 
 func TestProductionLondonReplicationActivationGuards(t *testing.T) {
-	data, err := os.ReadFile("deploy/activate-production-london-replication-0.8.74.sh")
+	data, err := os.ReadFile("deploy/activate-production-london-replication-0.8.77.sh")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -28,8 +28,10 @@ func TestProductionLondonReplicationActivationGuards(t *testing.T) {
 		"staging-journal.after.db",
 		"production-entitlement-authority-key",
 		"LoadCredential=replica-delivery-key",
+		"bitcoinwalk-production-london-0.8.77",
 	} {
-		if !strings.Contains(script+mustReadDeployFile(t, "deploy/40-production-london-replication-0.8.73.conf"), required) {
+		configs := mustReadDeployFile(t, "deploy/40-production-london-replication-0.8.77.conf") + mustReadDeployFile(t, "deploy/95-production-london-version-0.8.77.conf")
+		if !strings.Contains(script+configs, required) {
 			t.Fatalf("production London activation lacks guard %q", required)
 		}
 	}

@@ -5,11 +5,12 @@ test "$EUID" -eq 0 || { echo 'Run this installer with sudo.' >&2; exit 1; }
 test "$#" -eq 0 || { echo "Usage: $0" >&2; exit 1; }
 root_dir=$(cd "$(dirname "$0")/.." && pwd);cd "$root_dir"
 
-manifest=PRODUCTION-LONDON-REPLICATION-0.8.74-SHA256SUMS
-artifact="$root_dir/bitcoinwalk-relay-production-london-0.8.73"
-audit="$root_dir/replica-audit-production-london-0.8.73"
+manifest=PRODUCTION-LONDON-REPLICATION-0.8.77-SHA256SUMS
+artifact="$root_dir/bitcoinwalk-relay-production-london-0.8.77"
+audit="$root_dir/replica-audit-production-london-0.8.77"
 promotion_manifest="$root_dir/deploy/production-promotion-0.8.64.json"
-dropin_template="$root_dir/deploy/40-production-london-replication-0.8.73.conf"
+dropin_template="$root_dir/deploy/40-production-london-replication-0.8.77.conf"
+version_template="$root_dir/deploy/95-production-london-version-0.8.77.conf"
 service=bitcoinwalk-relay-production.service
 binary=/opt/bitcoinwalk-relay-production/bitcoinwalk-relay
 database=/var/lib/bitcoinwalk-relay-production/events.db
@@ -18,6 +19,7 @@ config_dir=/etc/bitcoinwalk-replication-production
 registry="$config_dir/registry.json"
 ledger="$config_dir/entitlements.json"
 dropin=/etc/systemd/system/bitcoinwalk-relay-production.service.d/40-london-replication.conf
+version_dropin=/etc/systemd/system/bitcoinwalk-relay-production.service.d/95-london-replication-version.conf
 delivery_key=/etc/bitcoinwalk-replication/replica-delivery-key
 staging_registry=/etc/bitcoinwalk-replication/registry.json
 staging_journal=/var/lib/bitcoinwalk-relay/replication-journal.db
@@ -55,7 +57,7 @@ audit_public(){
 
 sha256sum -c "$manifest"
 for command in curl python3 sha256sum mktemp install systemctl journalctl date sed grep stat;do command -v "$command" >/dev/null;done
-for file in "$artifact" "$audit" "$promotion_manifest" "$dropin_template" "$binary" "$database" "$delivery_key" "$staging_registry" "$staging_journal" "$payments";do test -f "$file";done
+for file in "$artifact" "$audit" "$promotion_manifest" "$dropin_template" "$version_template" "$binary" "$database" "$delivery_key" "$staging_registry" "$staging_journal" "$payments";do test -f "$file";done
 test -x "$artifact";test -x "$audit"
 systemctl is-active --quiet "$service"
 systemctl is-active --quiet bitcoinwalk-relay.service
@@ -65,6 +67,7 @@ curl --fail --silent --show-error --max-time 10 http://127.0.0.1:3338/api/health
 test ! -e "$config_dir"
 test ! -e "$journal"
 test ! -e "$dropin"
+test ! -e "$version_dropin"
 ! systemctl cat "$service" | grep -q 'RELAY_REPLICA_REGISTRY='
 
 evidence=$(python3 - "$payments" "$city" <<'PY'
@@ -105,7 +108,7 @@ recover(){
  if "$activated";then
   systemctl stop "$service" >/dev/null 2>&1||true
   install -o root -g root -m 0755 "$backup/production-binary.before" "$binary"
-  rm -f "$dropin" "$journal"
+  rm -f "$dropin" "$version_dropin" "$journal"
   rm -rf "$config_dir"
   systemctl daemon-reload >/dev/null 2>&1||true
  fi
@@ -182,6 +185,7 @@ install -o "$state_uid" -g "$state_gid" -m 0600 "$backup/replication-journal.emp
 install -o root -g root -m 0755 "$artifact" "$binary"
 sed "s/__ENTITLEMENT_AUTHORITY__/$authority/" "$dropin_template" >"$dropin"
 chown root:root "$dropin";chmod 0644 "$dropin"
+install -o root -g root -m 0644 "$version_template" "$version_dropin"
 activated=true
 systemctl daemon-reload
 systemctl reset-failed "$service"||true
@@ -189,7 +193,7 @@ activation_since=$(date --iso-8601=seconds)
 systemctl start "$service";production_stopped=false
 wait_health http://127.0.0.1:3340/healthz
 curl --fail --silent --show-error --max-time 10 -H 'Accept: application/nostr+json' http://127.0.0.1:3340/ >"$backup/nip11.after.json"
-grep -q 'bitcoinwalk-production-london-0.8.73' "$backup/nip11.after.json"
+grep -q 'bitcoinwalk-production-london-0.8.77' "$backup/nip11.after.json"
 
 delivery_ok=false
 for attempt in $(seq 1 30);do
@@ -220,7 +224,7 @@ systemctl is-active --quiet bitcoinwalk-guide.service
 
 (cd "$backup" && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum >SHA256SUMS)
 trap - EXIT HUP INT TERM
-echo "London production entitlement and registry accepted on 0.8.74. Backup: $backup"
+echo "London production entitlement and registry accepted on 0.8.77. Backup: $backup"
 echo 'London is the sole entitled production replica destination and remained exact 8/8 across source restart.'
 echo 'The raw payment hash was neither printed nor copied; only its domain-separated SHA-256 commitment was retained.'
 echo 'The staging registry, stable staging journal, application, Guide and signed directory chain remained unchanged.'
