@@ -5,10 +5,10 @@ test "$EUID" -eq 0 || { echo 'Run this installer with sudo.' >&2; exit 1; }
 test "$#" -eq 0 || { echo "Usage: $0" >&2; exit 1; }
 root_dir=$(cd "$(dirname "$0")/.." && pwd);cd "$root_dir"
 
-checksums=PRODUCTION-HANOVER-0.8.90-SHA256SUMS
+checksums=PRODUCTION-HANOVER-0.8.91-SHA256SUMS
 builder="$root_dir/bitcoinwalk-relay-production-additive-0.8.85"
 audit="$root_dir/replica-audit-production-additive-0.8.85"
-manifest="$root_dir/deploy/production-additive-hanover-0.8.90.json"
+manifest="$root_dir/deploy/production-additive-hanover-0.8.91.json"
 source_service=bitcoinwalk-relay.service
 production_service=bitcoinwalk-relay-production.service
 source_db=/var/lib/bitcoinwalk-relay/events.db
@@ -19,7 +19,6 @@ ledger=/etc/bitcoinwalk-replication-production/entitlements.json
 journal=/var/lib/bitcoinwalk-relay-production/replication-journal.db
 city=d42123e1-1d01-473b-98e7-846342150eca
 london=ca2f9905-fb4d-4948-a12c-c792b28ec7c8
-london_relay=wss://london.bitcoinwalk.org/
 port=3363
 
 wait_health(){ local url=$1 ready=false;for attempt in $(seq 1 40);do if curl --fail --silent --max-time 3 "$url" >/dev/null;then ready=true;break;fi;sleep 1;done;"$ready"; }
@@ -93,7 +92,8 @@ PY
 cp -p "$backup/production.candidate.db" "$isolated/events.db"
 env -i PATH=/usr/bin:/bin RELAY_LISTEN="127.0.0.1:$port" RELAY_DB="$isolated/events.db" RELAY_ORGANIZER_MODE=true RELAY_NAME='BitcoinWalk isolated Hanover candidate' "$production_binary" >"$backup/isolated.log" 2>&1 &
 isolated_pid=$!;wait_health "http://127.0.0.1:$port/healthz"
-"$audit" -source ws://127.0.0.1:3334 -replica "ws://127.0.0.1:$port" -city "$city" >"$backup/hanover.candidate.json";verify_audit "$backup/hanover.candidate.json" "$city";stop_isolated
+"$audit" -source ws://127.0.0.1:3334 -replica "ws://127.0.0.1:$port" -city "$city" >"$backup/hanover.candidate.json";verify_audit "$backup/hanover.candidate.json" "$city"
+"$audit" -source ws://127.0.0.1:3340 -replica "ws://127.0.0.1:$port" -city "$london" >"$backup/london.candidate.json";verify_audit "$backup/london.candidate.json" "$london";stop_isolated
 
 systemctl stop "$production_service";activated=true
 install -o "$production_uid" -g "$production_gid" -m 0600 "$backup/production.candidate.db" "$production_db"
@@ -102,7 +102,6 @@ systemctl start "$production_service";wait_health http://127.0.0.1:3340/healthz
 systemctl restart "$production_service";wait_health http://127.0.0.1:3340/healthz
 "$audit" -source ws://127.0.0.1:3334 -replica ws://127.0.0.1:3340 -city "$city" >"$backup/hanover.after-restart.json";verify_audit "$backup/hanover.after-restart.json" "$city"
 
-"$audit" -source ws://127.0.0.1:3340 -replica "$london_relay" -city "$london" >"$backup/london.after.json";verify_audit "$backup/london.after.json" "$london"
 cp -p "$registry" "$backup/registry.after.json";cp -p "$ledger" "$backup/entitlements.after.json";cp -p "$journal" "$backup/production-journal.after.db"
 cmp "$backup/registry.before.json" "$backup/registry.after.json";cmp "$backup/entitlements.before.json" "$backup/entitlements.after.json"
 RELAY_REPLICA_JOURNAL_STABLE_DIGEST="$backup/production-journal.after.db" "$builder" >"$backup/production-journal.after.digest";cmp "$backup/production-journal.before.digest" "$backup/production-journal.after.digest"
