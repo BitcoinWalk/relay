@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "cities": [
+    {
+      "cityId": "e62592ac-a5fc-42df-8f31-94416f6ee8d5",
+      "slug": "graz",
+      "tier": "paid",
+      "revisionId": "eb0e605fe77701f0771682271090b995d9e46836c63b87b0186285f8f66e6f9e",
+      "approvalId": "fff8a1d9bee7c0017aeeaaaab58d3f396fa8a66ce091e08316da869ad4b5a010"
+    }
+  ]
+}
