@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "cities": [
+    {
+      "cityId": "d42123e1-1d01-473b-98e7-846342150eca",
+      "slug": "hanover",
+      "tier": "paid",
+      "revisionId": "750f9dbf4e14cad5ac683772e318a46efe18e3a0fc5831d7eb021c21f92d69a3",
+      "approvalId": "7d53ad2bd7d50c390f2531bab25ffc1e07729e69272feb7d9709067f82bfb2b3"
+    }
+  ]
+}
