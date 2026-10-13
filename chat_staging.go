@@ -19,8 +19,8 @@ import (
 
 func runChat() error {
 	mode := env("RELAY_CHAT_MODE", "")
-	if mode != "staging" && mode != "production" {
-		return errors.New("RELAY_CHAT_MODE must be staging or production")
+	if mode != "staging" && mode != "production" && mode != "city" {
+		return errors.New("RELAY_CHAT_MODE must be staging, production or city")
 	}
 	listen := env("RELAY_CHAT_LISTEN", "127.0.0.1:3335")
 	host, _, err := net.SplitHostPort(listen)
@@ -53,6 +53,14 @@ func runChat() error {
 		r.Info.Name = "BitcoinWalk Community"
 		r.Info.Description = "The members-only global community relay for free-tier BitcoinWalk cities."
 		r.Info.Version = "bitcoinwalk-chat-0.2.0"
+	} else if mode == "city" {
+		name := os.Getenv("RELAY_CHAT_NAME")
+		if name == "" {
+			return errors.New("RELAY_CHAT_NAME is required in city mode")
+		}
+		r.Info.Name = name
+		r.Info.Description = "Dedicated BitcoinWalk Pro city community relay."
+		r.Info.Version = "bitcoinwalk-chat-city-0.8.96"
 	} else {
 		r.Info.Name = "BitcoinWalk chat staging"
 	}

@@ -30,7 +30,10 @@ func newChatRelay(store *chatstate.Store) *khatru.Relay {
 	r := khatru.NewRelay()
 	r.Info.Name = "BitcoinWalk private chat pilot"
 	r.Info.Version = "bitcoinwalk-chat-local-0.1.0"
-	r.Info.SupportedNIPs = []any{1, 11, 42} // Do not claim complete NIP-29 yet.
+	// This relay implements the bounded NIP-29 profile exercised below:
+	// relay-signed discovery metadata, authenticated open joining/leaving,
+	// scoped group messages, membership visibility and moderator removal.
+	r.Info.SupportedNIPs = []any{1, 11, 29, 42}
 	if self, ok := store.RelayIdentity(); ok {
 		r.Info.Self = &self
 	}

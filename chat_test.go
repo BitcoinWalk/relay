@@ -14,6 +14,26 @@ import (
 	"github.com/coder/websocket"
 )
 
+func TestChatAdvertisesBoundedNIP29Profile(t *testing.T) {
+	admin := nostr.Generate()
+	store, err := chatstate.OpenSigned(filepath.Join(t.TempDir(), "chat.db"), nostr.GetPublicKey(admin), nostr.Generate())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	relay := newChatRelay(store)
+	found := false
+	for _, nip := range relay.Info.SupportedNIPs {
+		if nip == 29 {
+			found = true
+			break
+		}
+	}
+	if !found || relay.Info.Self == nil {
+		t.Fatal("NIP-29 profile requires advertised support and relay identity")
+	}
+}
+
 func TestChatWebSocketMembershipAndRevocation(t *testing.T) {
 	admin, user, outsider := nostr.Generate(), nostr.Generate(), nostr.Generate()
 	s, err := chatstate.OpenSigned(filepath.Join(t.TempDir(), "chat.db"), nostr.GetPublicKey(admin), nostr.Generate())

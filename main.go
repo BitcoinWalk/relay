@@ -219,7 +219,7 @@ func run() error {
 	if os.Getenv("RELAY_CHAT_BACKUP") != "" {
 		return backupChat()
 	}
-	if mode := env("RELAY_CHAT_MODE", ""); mode == "staging" || mode == "production" {
+	if mode := env("RELAY_CHAT_MODE", ""); mode == "staging" || mode == "production" || mode == "city" {
 		return runChat()
 	}
 	if env("RELAY_CHAT_CHOOSER", "false") == "true" {

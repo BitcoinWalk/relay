@@ -1,0 +1,4 @@
+3275bb27531eeef174d2d62c1f89735dffea2a81ac98d738acc16ac1623aac00  bitcoinwalk-chat-london-0.8.96
+f99651280c9bd8dd8091a45102942baca1818013fcf52e3edfa01a159fccbbfe  deploy/bitcoinwalk-chat-london-0.8.96.service
+e2166da5f4782162e4513123cb9157cf25e47eeedd4e4e61ea5da24d4e5b837e  deploy/chat-london-0.8.96.caddy
+438b2d21269b38deb3aab5f0be9b8301b27ca20ae2482f9db75a3719a39bdaf3  deploy/install-london-community-0.8.96.sh

@@ -1,0 +1,30 @@
+# Dedicated London community relay. The city event relay remains a separate
+# service at london.bitcoinwalk.org.
+chat-london.bitcoinwalk.org {
+	route {
+		@relay {
+			path /
+			header Upgrade websocket
+		}
+		handle @relay {
+			reverse_proxy 127.0.0.1:3346 {
+				header_up X-Forwarded-Host chat-london.bitcoinwalk.org
+				header_up X-Forwarded-Proto https
+				header_up -Forwarded
+			}
+		}
+		@info {
+			path /
+			header Accept *application/nostr+json*
+		}
+		handle @info {
+			reverse_proxy 127.0.0.1:3346
+		}
+		handle /healthz {
+			reverse_proxy 127.0.0.1:3346
+		}
+		handle {
+			respond "BitcoinWalk London community relay." 404
+		}
+	}
+}
