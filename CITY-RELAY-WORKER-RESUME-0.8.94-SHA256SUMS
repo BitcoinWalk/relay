@@ -1,0 +1,3 @@
+87b8dc0d6f83ea65d4d4bc4d288c427d5b59e7e9d00c224a46b63e0015658098  deploy/run-paid-city-relay-worker-0.8.94.sh
+0bce64c8e36bf2fe84f69eb8c2e142bb55570ed4affadaca02c3b02ea7416688  deploy/bitcoinwalk-city-relay-provisioner-0.8.94.service
+2587246e74e48482e3359910988be60cc1d743bf7533795fbdb4193d5fc3d9c7  deploy/resume-city-relay-worker-0.8.94.sh

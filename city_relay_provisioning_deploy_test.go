@@ -72,3 +72,19 @@ func TestPaidCityWorkerResumeCreatesDeclaredWritableRoots(t *testing.T) {
 		}
 	}
 }
+
+func TestPaidCityWorkerPinsOnlyTheProductionAPIConnection(t *testing.T) {
+	data, err := os.ReadFile("deploy/run-paid-city-relay-worker-0.8.94.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := string(data)
+	for _, required := range []string{"bitcoinwalk.org:443:213.232.235.138", "--resolve \"$resolve\"", "Unexpected production app resolution"} {
+		if !strings.Contains(script, required) {
+			t.Fatalf("missing production endpoint guard %q", required)
+		}
+	}
+	if strings.Contains(script, "/etc/hosts") {
+		t.Fatal("worker must not change host-wide name resolution")
+	}
+}

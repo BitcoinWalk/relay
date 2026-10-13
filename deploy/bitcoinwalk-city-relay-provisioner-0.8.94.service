@@ -1,0 +1,25 @@
+[Unit]
+Description=BitcoinWalk paid-city relay provisioning worker
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/bitcoinwalk-city-relay-provisioner/deploy/run-paid-city-relay-worker-0.8.94.sh
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+PrivateTmp=yes
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ReadWritePaths=/opt/bitcoinwalk-city-relays /var/lib/bitcoinwalk-city-relays /var/lib/bitcoinwalk-city-relay-gateway /var/backups /run /var/run/docker.sock
+
+[Install]
+WantedBy=multi-user.target
