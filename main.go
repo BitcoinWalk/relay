@@ -391,6 +391,14 @@ func run() error {
 		relay.Router().HandleFunc("GET /replication/status", replicaStatusHandler(journal, token))
 		log.Print("Authenticated content-free replica status enabled")
 	}
+	chatStore, err := enableCombinedCityChat(relay)
+	if err != nil {
+		return fmt.Errorf("enable combined city chat: %w", err)
+	}
+	if chatStore != nil {
+		defer chatStore.Close()
+		log.Print("Combined city event and NIP-29 community relay enabled with isolated stores")
+	}
 	if journal != nil {
 		defer journal.Close()
 	}
