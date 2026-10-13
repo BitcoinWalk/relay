@@ -1,0 +1,42 @@
+[Unit]
+Description=BitcoinWalk London dedicated community relay
+After=network.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+DynamicUser=yes
+StateDirectory=bitcoinwalk-chat-london
+StateDirectoryMode=0700
+WorkingDirectory=/var/lib/bitcoinwalk-chat-london
+ExecStart=/opt/bitcoinwalk-chat-london/bitcoinwalk-relay
+Environment=RELAY_CHAT_MODE=city
+Environment="RELAY_CHAT_NAME=BitcoinWalk London Community"
+Environment=RELAY_CHAT_LISTEN=127.0.0.1:3346
+Environment=RELAY_CHAT_DB=/var/lib/bitcoinwalk-chat-london/chat.db
+Environment=RELAY_CHAT_KEY_FILE=%d/relay-key
+EnvironmentFile=/etc/bitcoinwalk-chat-london/public.conf
+LoadCredential=relay-key:/etc/bitcoinwalk-chat-london/relay-key
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+MemoryMax=512M
+TasksMax=128
+
+[Install]
+WantedBy=multi-user.target
