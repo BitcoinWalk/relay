@@ -88,3 +88,19 @@ func TestPaidCityWorkerPinsOnlyTheProductionAPIConnection(t *testing.T) {
 		t.Fatal("worker must not change host-wide name resolution")
 	}
 }
+
+func TestPaidCityWorkerUsesPrivateWritableDockerConfiguration(t *testing.T) {
+	data, err := os.ReadFile("deploy/run-paid-city-relay-worker-0.8.95.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := string(data)
+	for _, required := range []string{`export DOCKER_CONFIG="$work/docker"`, `install -d -o root -g root -m 0700 "$DOCKER_CONFIG"`} {
+		if !strings.Contains(script, required) {
+			t.Fatalf("missing private Docker configuration guard %q", required)
+		}
+	}
+	if strings.Contains(script, "/root/.docker") {
+		t.Fatal("worker must not write Docker configuration under the protected root home")
+	}
+}
