@@ -17,7 +17,7 @@ func TestArmadaSettingsBanner(t *testing.T) {
 	defer func() { s.Close() }()
 	apply(t, s, event(t, admin, 9007, "austin"))
 	settings := func(banner string) nostr.Event {
-		return event(t, admin, 9002, "austin", nostr.Tag{"name", "chat"}, nostr.Tag{"about", ""}, nostr.Tag{"banner", banner}, nostr.Tag{"private"}, nostr.Tag{"visibility", "private"}, nostr.Tag{"open"})
+		return event(t, admin, 9002, "austin", nostr.Tag{"name", "chat"}, nostr.Tag{"about", ""}, nostr.Tag{"banner", banner}, nostr.Tag{"open"})
 	}
 	// Exact settings shape sent by Armada, including an empty banner.
 	apply(t, s, settings(""))
@@ -29,6 +29,8 @@ func TestArmadaSettingsBanner(t *testing.T) {
 		event(t, member, 9002, "austin", nostr.Tag{"banner", ""}),
 		event(t, admin, 9002, "austin", nostr.Tag{"banner", ""}, nostr.Tag{"public"}),
 		event(t, admin, 9002, "austin", nostr.Tag{"banner", ""}, nostr.Tag{"closed"}),
+		event(t, admin, 9002, "austin", nostr.Tag{"banner", ""}, nostr.Tag{"private"}),
+		event(t, admin, 9002, "austin", nostr.Tag{"banner", ""}, nostr.Tag{"visibility", "private"}),
 		event(t, admin, 9007, "other", nostr.Tag{"banner", ""}),
 	} {
 		if s.Apply(bad, bad.PubKey, time.Now()) == nil {
@@ -52,7 +54,7 @@ func TestArmadaSettingsBanner(t *testing.T) {
 					closed = true
 				}
 			}
-			if name != "chat" || banner != want || !private || closed {
+			if name != "chat" || banner != want || private || closed {
 				t.Fatalf("incorrect metadata: %v", e.Tags)
 			}
 			found = true

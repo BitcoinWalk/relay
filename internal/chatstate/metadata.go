@@ -52,7 +52,10 @@ func (s *Store) project(b *bbolt.Bucket, state State, request nostr.Event, now t
 	if name == "" {
 		name = "BitcoinWalk " + state.ID
 	}
-	info := nostr.Tags{{"d", state.ID}, {"name", name}, {"private"}, {"restricted"}, {"supported_kinds", "9"}}
+	// City Walkie Talkie discovery is public and joining is self-service. Chat
+	// history remains membership-gated by the transport/store policy; do not
+	// advertise the group itself as NIP-29 private or closed.
+	info := nostr.Tags{{"d", state.ID}, {"name", name}, {"supported_kinds", "9"}}
 	if state.About != "" {
 		info = append(info, nostr.Tag{"about", state.About})
 	}

@@ -233,14 +233,12 @@ func (s *Store) Apply(e nostr.Event, authenticated nostr.PubKey, now time.Time) 
 					return errors.New("invalid: banner must be empty or an HTTPS URL")
 				}
 			}
-		case "private", "open", "restricted":
+		case "open":
 			if e.Kind != 9002 || len(t) != 1 {
 				return errors.New("invalid: metadata flag")
 			}
-		case "visibility":
-			if e.Kind != 9002 || len(t) != 2 || t[1] != "private" {
-				return errors.New("restricted: members-only visibility required")
-			}
+		case "private", "restricted", "visibility":
+			return errors.New("restricted: public open-join metadata required")
 		case "h":
 		case "client":
 			if _, err := tag(e, "client", false); err != nil {

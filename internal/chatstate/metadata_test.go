@@ -109,3 +109,26 @@ func TestSignedStoreRejectsImplicitMigration(t *testing.T) {
 		t.Fatal("user key used as relay identity")
 	}
 }
+
+func TestNewGroupMetadataIsPublicAndOpenJoin(t *testing.T) {
+	admin, relay := nostr.Generate(), nostr.Generate()
+	s, err := OpenSigned(filepath.Join(t.TempDir(), "chat.db"), nostr.GetPublicKey(admin), relay)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	apply(t, s, event(t, admin, 9007, "london"))
+	found := false
+	err = s.DeliverMetadata(nostr.PubKey{}, nostr.Filter{Kinds: []nostr.Kind{39000}, Tags: nostr.TagMap{"d": {"london"}}}, func(e nostr.Event) error {
+		found = true
+		for _, tag := range e.Tags {
+			if len(tag) > 0 && (tag[0] == "private" || tag[0] == "closed" || tag[0] == "hidden") {
+				t.Fatalf("new public group advertised as %s", tag[0])
+			}
+		}
+		return nil
+	})
+	if err != nil || !found {
+		t.Fatalf("public group metadata missing: %v", err)
+	}
+}

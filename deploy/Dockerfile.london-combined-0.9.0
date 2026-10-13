@@ -1,0 +1,7 @@
+FROM scratch
+
+COPY bitcoinwalk-relay /usr/local/bin/bitcoinwalk-relay
+
+USER 65532:65532
+EXPOSE 3345
+ENTRYPOINT ["/usr/local/bin/bitcoinwalk-relay"]

@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func TestChatNameRecoveryAndPrivacy(t *testing.T) {
+func TestChatNameRecoveryAndPublicDiscovery(t *testing.T) {
 	admin, relay, user := nostr.Generate(), nostr.Generate(), nostr.Generate()
 	path := filepath.Join(t.TempDir(), "chat.db")
 	s, err := OpenSigned(path, nostr.GetPublicKey(admin), relay)
@@ -19,12 +19,14 @@ func TestChatNameRecoveryAndPrivacy(t *testing.T) {
 	if err := s.VerifyRecovery(); err != nil {
 		t.Fatal("legacy recovery", err)
 	}
-	rename := event(t, admin, 9002, "existing", nostr.Tag{"name", "chat"}, nostr.Tag{"private"}, nostr.Tag{"open"}, nostr.Tag{"visibility", "private"})
+	rename := event(t, admin, 9002, "existing", nostr.Tag{"name", "chat"}, nostr.Tag{"open"})
 	apply(t, s, rename)
 	for _, bad := range []nostr.Event{
 		event(t, user, 9002, "existing", nostr.Tag{"name", "bad"}),
 		event(t, admin, 9002, "existing", nostr.Tag{"public"}),
 		event(t, admin, 9002, "existing", nostr.Tag{"closed"}),
+		event(t, admin, 9002, "existing", nostr.Tag{"private"}),
+		event(t, admin, 9002, "existing", nostr.Tag{"visibility", "private"}),
 		event(t, admin, 9002, "existing", nostr.Tag{"name", ""}),
 	} {
 		if err := s.Apply(bad, bad.PubKey, time.Now()); err == nil {
@@ -50,8 +52,8 @@ func TestChatNameRecoveryAndPrivacy(t *testing.T) {
 				private = true
 			}
 		}
-		if name != "chat" || !private {
-			t.Fatal("name/privacy not persisted")
+		if name != "chat" || private {
+			t.Fatal("name/public discovery not persisted")
 		}
 		found = true
 		return nil

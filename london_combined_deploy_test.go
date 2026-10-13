@@ -96,3 +96,19 @@ func TestLondonCombinedActivationKeepsSeparateStoresAndRollback(t *testing.T) {
 		}
 	}
 }
+
+func TestLondonPublicWalkieTalkieUpgradePreservesEmptyCombinedState(t *testing.T) {
+	script, err := os.ReadFile("deploy/upgrade-london-public-walkie-talkie-0.9.0.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(script)
+	for _, required := range []string{
+		"chat-digest.before", "event-digest.before", "chat-relay-key.recovery",
+		"combined relay 0.8.99 was restored", "No group was created",
+	} {
+		if !strings.Contains(text, required) {
+			t.Fatalf("missing public Walkie Talkie upgrade gate %q", required)
+		}
+	}
+}
