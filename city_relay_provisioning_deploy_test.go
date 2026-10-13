@@ -59,3 +59,16 @@ func TestPaidCityWorkerDoesNotExposeCredentialOrRawFailure(t *testing.T) {
 		}
 	}
 }
+
+func TestPaidCityWorkerResumeCreatesDeclaredWritableRoots(t *testing.T) {
+	data, err := os.ReadFile("deploy/resume-city-relay-worker-0.8.93.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := string(data)
+	for _, required := range []string{"install -d -o root -g root -m 0700 /opt/bitcoinwalk-city-relays /var/lib/bitcoinwalk-city-relays", "systemctl reset-failed", "systemctl start bitcoinwalk-city-relay-provisioner.service"} {
+		if !strings.Contains(script, required) {
+			t.Fatalf("missing worker resume guard %q", required)
+		}
+	}
+}
