@@ -1,0 +1,12 @@
+[Unit]
+Description=Poll for verified BitcoinWalk paid-city relay work
+
+[Timer]
+OnBootSec=45s
+OnUnitActiveSec=30s
+AccuracySec=5s
+Persistent=true
+Unit=bitcoinwalk-city-relay-provisioner.service
+
+[Install]
+WantedBy=timers.target

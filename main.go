@@ -124,6 +124,9 @@ func newRelay(dbPath string, writers map[nostr.PubKey]bool) (*khatru.Relay, *bol
 }
 
 func run() error {
+	if cityRelayGatewayConfigured() {
+		return runCityRelayGateway()
+	}
 	if productionAdditiveConfigured() {
 		return runProductionAdditive()
 	}

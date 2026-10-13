@@ -1,0 +1,10 @@
+26656db5d978b13eb7b74d4c2e8eeaf508efc81b667e414e6b709c593770ea5d  bitcoinwalk-relay-city-0.8.92
+528bbf153ed94b9d5ff5b2496794dec476f296acab390c20ec40385e503e6d9b  replica-audit-city-0.8.92
+fb5852a6ed65dec681de2fec9cc23e523474203b8add64942577e9a66c7ff94a  deploy/Dockerfile.city-relay-0.8.92
+52522908916fe72eeae2b5b3d69d87a5693e50fadb4eca03baed7bf33e12e9d2  deploy/compose.city-relay-gateway-0.8.92.yaml
+5ee6f001286204a378b0500a9afce3be01da4801d044d5e02627b05567906e7d  deploy/install-city-relay-gateway-0.8.92.sh
+9b69e8fce3412c7c2ff8c8e79202dd19efb92a83fc07fdf2827db0ba3d1e233f  deploy/provision-paid-city-relay-0.8.92.sh
+692e1b498efcb6d2797291adc5f55dddb8cd09f448ff11f77bcabe42f6041c1d  deploy/run-paid-city-relay-worker-0.8.92.sh
+a8d7ba227a234d67b8558f94bbfd8df066f2e50c701a8b81ed36d5d573183da8  deploy/bitcoinwalk-city-relay-provisioner-0.8.92.service
+33daac839758a4dc0c783ef9c3141c7db2e78d4ec6b12924d5fae01cd4cfa5fc  deploy/bitcoinwalk-city-relay-provisioner-0.8.92.timer
+a7663e375cd824df4b4c78286d287a40619b1edb5b79bea68f301472ee24173b  deploy/install-city-relay-worker-0.8.92.sh

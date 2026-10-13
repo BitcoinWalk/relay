@@ -1,0 +1,31 @@
+services:
+  gateway:
+    image: bitcoinwalk-city-relay-gateway:0.8.92
+    container_name: bitcoinwalk-city-relay-gateway
+    init: true
+    restart: unless-stopped
+    read_only: true
+    user: "65532:65532"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 64
+    mem_limit: 128m
+    stop_grace_period: 20s
+    environment:
+      RELAY_CITY_GATEWAY_LISTEN: 0.0.0.0:8080
+      RELAY_CITY_GATEWAY_REGISTRY: /config/registry.json
+    volumes:
+      - /var/lib/bitcoinwalk-city-relay-gateway:/config:ro
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=16m,mode=0700,uid=65532,gid=65532
+    expose:
+      - "8080"
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true
+    name: root_my_custom_network
