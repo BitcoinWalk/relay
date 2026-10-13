@@ -60,16 +60,10 @@ chmod 0700 "$backup"
 cp -p "$target/bitcoinwalk-relay" "$backup/bitcoinwalk-relay.before"
 cp -p "$target/Dockerfile" "$backup/Dockerfile.before"
 cp -p "$target/compose.yaml" "$backup/compose.before.yaml"
-cp -p "$state/events.db" "$backup/events.db"
-cp -p "$state/chat.db" "$backup/chat.db"
-cp -p "$state/chat-relay-key" "$backup/chat-relay-key.recovery"
-digest "$state/events.db" >"$backup/event-digest.before"
-digest "$state/chat.db" >"$backup/chat-digest.before"
-audit_exact "$backup/events.before.json"
-"$probe" -relay "$endpoint" >"$backup/chat.before.json"
-completed=0; changed=0
+completed=0; changed=0; container_stopped=0
 rollback() {
   code=$?; trap - EXIT HUP INT TERM
+  if test "$container_stopped" -eq 1; then docker start "$container" >/dev/null 2>&1 || true; fi
   if test "$changed" -eq 1; then
     docker compose -p "$project" -f "$target/compose.yaml" down >/dev/null 2>&1 || true
     install -o root -g root -m 0555 "$backup/bitcoinwalk-relay.before" "$target/bitcoinwalk-relay"
@@ -87,18 +81,38 @@ rollback() {
 trap rollback EXIT HUP INT TERM
 
 docker stop -t 20 "$container" >/dev/null
+container_stopped=1
+cp -p "$state/events.db" "$backup/events.db"
+cp -p "$state/chat.db" "$backup/chat.db"
+cp -p "$state/chat-relay-key" "$backup/chat-relay-key.recovery"
+digest "$state/events.db" >"$backup/event-digest.before"
+digest "$state/chat.db" >"$backup/chat-digest.before"
+docker start "$container" >/dev/null
+container_stopped=0
+wait_public
+audit_exact "$backup/events.before.json"
+"$probe" -relay "$endpoint" >"$backup/chat.before.json"
+
+docker stop -t 20 "$container" >/dev/null
+container_stopped=1
 changed=1
 install -o root -g root -m 0555 "$artifact" "$target/bitcoinwalk-relay"
 install -o root -g root -m 0444 deploy/Dockerfile.london-combined-0.9.0 "$target/Dockerfile"
 install -o root -g root -m 0444 deploy/compose.london-combined-0.9.0.yaml "$target/compose.yaml"
 docker build --pull=false --network=none -t "$image" "$target" >"$backup/docker-build.log"
 docker compose -p "$project" -f "$target/compose.yaml" up -d --no-build --force-recreate >/dev/null
+container_stopped=0
 wait_public
 capture_nip11 "$backup/nip11.activated.json"
 audit_exact "$backup/events.activated.json"
 "$probe" -relay "$endpoint" >"$backup/chat.activated.json"
+docker stop -t 20 "$container" >/dev/null
+container_stopped=1
 digest "$state/events.db" >"$backup/event-digest.activated"
 digest "$state/chat.db" >"$backup/chat-digest.activated"
+docker start "$container" >/dev/null
+container_stopped=0
+wait_public
 cmp "$backup/event-digest.before" "$backup/event-digest.activated"
 cmp "$backup/chat-digest.before" "$backup/chat-digest.activated"
 
@@ -107,8 +121,13 @@ wait_public
 capture_nip11 "$backup/nip11.restart.json"
 audit_exact "$backup/events.restart.json"
 "$probe" -relay "$endpoint" >"$backup/chat.restart.json"
+docker stop -t 20 "$container" >/dev/null
+container_stopped=1
 digest "$state/events.db" >"$backup/event-digest.restart"
 digest "$state/chat.db" >"$backup/chat-digest.restart"
+docker start "$container" >/dev/null
+container_stopped=0
+wait_public
 cmp "$backup/event-digest.before" "$backup/event-digest.restart"
 cmp "$backup/chat-digest.before" "$backup/chat-digest.restart"
 test -z "$(docker port "$container")"

@@ -3,4 +3,4 @@ d9e12003ffe06b6ba5ab1d121c16a802444bb8024e3adc3b0ad5e32620d1c31f  bitcoinwalk-re
 df838b47b755f7949b9bb12d2d755a416487b3c9b6863e4989eea44395e2f112  combined-chat-probe-0.9.0
 8c40ae25546e6f6b76db19f053b1485b6f222129418a9fe87c4c7a0188b98bb5  deploy/Dockerfile.london-combined-0.9.0
 bbba2b385851b819bd92b595f3988f6d7188406739b3f383c809a9a1728f848f  deploy/compose.london-combined-0.9.0.yaml
-82b38d80f3c2bf4518af3b83b9013002c060dee12abb8afe90da066a5a59f6e0  deploy/upgrade-london-public-walkie-talkie-0.9.0.sh
+a9e8b73c0e1014984a36d1e8597e0920948a567f14b0aca9326ad9e3a8e5e0f2  deploy/upgrade-london-public-walkie-talkie-0.9.0.sh
