@@ -167,7 +167,7 @@ verify_candidate_topology "$backup/candidate-container.first.json"
 capture_candidate_nip11 "$backup/candidate-nip11.first.json"
 ip=$(candidate_ip)
 audit_exact "ws://$ip:$port" "$backup/candidate-events.first.json"
-"$probe" -relay "ws://$ip:$port" >"$backup/candidate-chat.first.json"
+"$probe" -relay "ws://$ip:$port" -auth-relay "wss://london.bitcoinwalk.org" >"$backup/candidate-chat.first.json"
 
 docker stop -t 20 "$candidate_container" >/dev/null
 RELAY_REPLICA_DB_DIGEST="$candidate_state/events.db" "$artifact" >"$backup/candidate-event-digest.first"
@@ -179,7 +179,7 @@ verify_candidate_topology "$backup/candidate-container.restart.json"
 capture_candidate_nip11 "$backup/candidate-nip11.restart.json"
 ip=$(candidate_ip)
 audit_exact "ws://$ip:$port" "$backup/candidate-events.restart.json"
-"$probe" -relay "ws://$ip:$port" >"$backup/candidate-chat.restart.json"
+"$probe" -relay "ws://$ip:$port" -auth-relay "wss://london.bitcoinwalk.org" >"$backup/candidate-chat.restart.json"
 cmp "$backup/candidate-nip11.first.json" "$backup/candidate-nip11.restart.json"
 cmp "$backup/candidate-events.first.json" "$backup/candidate-events.restart.json"
 cmp "$backup/candidate-chat.first.json" "$backup/candidate-chat.restart.json"

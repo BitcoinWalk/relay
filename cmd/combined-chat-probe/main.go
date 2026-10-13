@@ -25,6 +25,7 @@ type report struct {
 
 func run() error {
 	relayURL := flag.String("relay", "", "combined relay URL")
+	authRelayURL := flag.String("auth-relay", "", "canonical relay URL used in the NIP-42 proof")
 	flag.Parse()
 	if *relayURL == "" {
 		return errors.New("-relay is required")
@@ -61,6 +62,12 @@ func run() error {
 		return errors.New("combined relay did not require chat authentication")
 	}
 	probe.Unsub()
+	if *authRelayURL != "" {
+		// Rehearsals connect over an isolated Docker address while the relay
+		// deliberately validates authentication against its canonical origin.
+		// Changing this field affects the proof tag, not the open WebSocket.
+		client.URL = nostr.NormalizeURL(*authRelayURL)
+	}
 	if err := client.Auth(ctx, func(_ context.Context, event *nostr.Event) error { return event.Sign(key) }); err != nil {
 		return fmt.Errorf("authenticate rehearsal identity: %w", err)
 	}
