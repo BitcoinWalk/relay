@@ -1,0 +1,55 @@
+package main
+
+import (
+	"os"
+	"strings"
+	"testing"
+)
+
+func TestLondonCombinedRehearsalPreservesIsolation(t *testing.T) {
+	compose, err := os.ReadFile("deploy/compose.london-combined-rehearsal-0.8.98.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(compose)
+	for _, required := range []string{
+		`user: "65532:65532"`,
+		"read_only: true",
+		"no-new-privileges:true",
+		"root_my_custom_network",
+		`RELAY_CHAT_COMBINED: "true"`,
+		"RELAY_CHAT_DB: /data/chat.db",
+		"RELAY_CHAT_KEY_FILE: /data/chat-relay-key",
+		"RELAY_DB: /data/events.db",
+		"wss://london.bitcoinwalk.org",
+	} {
+		if !strings.Contains(text, required) {
+			t.Fatalf("missing combined London rehearsal setting %q", required)
+		}
+	}
+	if strings.Contains(text, "ports:") {
+		t.Fatal("combined London rehearsal publishes a host port")
+	}
+}
+
+func TestLondonCombinedRehearsalIsNonMutating(t *testing.T) {
+	data, err := os.ReadFile("deploy/rehearse-london-combined-0.8.98.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := string(data)
+	for _, required := range []string{
+		"live-events.before.json",
+		"live-events.accepted.json",
+		"candidate-event-digest.restart",
+		"candidate-chat-digest.restart",
+		"combined-chat-probe",
+		"chat-relay-key.recovery",
+		"docker port",
+		"remove_candidate",
+	} {
+		if !strings.Contains(script, required) {
+			t.Fatalf("missing combined London rehearsal gate %q", required)
+		}
+	}
+}
