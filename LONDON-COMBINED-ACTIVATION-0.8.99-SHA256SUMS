@@ -1,0 +1,6 @@
+b8499b5fe5ac7fb6f63004313c07b7cb6471546d9379e324fb2934fdb9ccdeea  bitcoinwalk-relay-london-combined-0.8.99
+ce5631d023500048126db216decfac0a4d6c77f15a7ca5caf0482b225c6750d4  replica-audit-london-combined-0.8.99
+59e2520be1fae5df295ebb97495304d6e47972d7c4984a0e87bbdca44be65795  combined-chat-probe-0.8.99
+8c40ae25546e6f6b76db19f053b1485b6f222129418a9fe87c4c7a0188b98bb5  deploy/Dockerfile.london-combined-0.8.99
+0cfec49dcecd700e042fd40d1fe833078395166832d5de0d5f26280fd3de8708  deploy/compose.london-combined-0.8.99.yaml
+90c5e6063b07a0ef6b0e04e8b06829d802723f8f8997d811e9ad88a5f31822cd  deploy/activate-london-combined-0.8.99.sh

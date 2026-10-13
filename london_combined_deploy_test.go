@@ -53,3 +53,46 @@ func TestLondonCombinedRehearsalIsNonMutating(t *testing.T) {
 		}
 	}
 }
+
+func TestLondonCombinedActivationKeepsSeparateStoresAndRollback(t *testing.T) {
+	compose, err := os.ReadFile("deploy/compose.london-combined-0.8.99.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(compose)
+	for _, required := range []string{
+		"RELAY_DB: /data/events.db",
+		"RELAY_CHAT_DB: /data/chat.db",
+		"RELAY_CHAT_KEY_FILE: /data/chat-relay-key",
+		"bitcoinwalk-city-community-relay-0.8.99",
+		`user: "65532:65532"`,
+		"read_only: true",
+		"no-new-privileges:true",
+	} {
+		if !strings.Contains(text, required) {
+			t.Fatalf("missing combined London activation setting %q", required)
+		}
+	}
+	if strings.Contains(text, "ports:") {
+		t.Fatal("combined London activation publishes a host port")
+	}
+
+	data, err := os.ReadFile("deploy/activate-london-combined-0.8.99.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := string(data)
+	for _, required := range []string{
+		"chat-relay-key.recovery",
+		"event-digest.before",
+		"event-digest.restart",
+		"chat-digest.restart",
+		"events.accepted.json",
+		"compose.before.yaml",
+		"the accepted event-only relay was restored",
+	} {
+		if !strings.Contains(script, required) {
+			t.Fatalf("missing combined London activation gate %q", required)
+		}
+	}
+}
