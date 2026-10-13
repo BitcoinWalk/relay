@@ -171,8 +171,8 @@ audit_exact "ws://$ip:$port" "$backup/candidate-events.first.json"
 
 docker stop -t 20 "$candidate_container" >/dev/null
 RELAY_REPLICA_DB_DIGEST="$candidate_state/events.db" "$artifact" >"$backup/candidate-event-digest.first"
-RELAY_CHAT_DB="$candidate_state/chat.db" RELAY_CHAT_KEY_FILE="$candidate_state/chat-relay-key" RELAY_CHAT_BACKUP="$backup/candidate-chat.first.db" "$artifact"
 RELAY_REPLICA_DB_DIGEST="$candidate_state/chat.db" "$artifact" >"$backup/candidate-chat-digest.first"
+cp -p "$candidate_state/chat.db" "$backup/candidate-chat.first.db"
 docker start "$candidate_container" >/dev/null
 wait_candidate
 verify_candidate_topology "$backup/candidate-container.restart.json"
@@ -186,8 +186,8 @@ cmp "$backup/candidate-chat.first.json" "$backup/candidate-chat.restart.json"
 
 docker stop -t 20 "$candidate_container" >/dev/null
 RELAY_REPLICA_DB_DIGEST="$candidate_state/events.db" "$artifact" >"$backup/candidate-event-digest.restart"
-RELAY_CHAT_DB="$candidate_state/chat.db" RELAY_CHAT_KEY_FILE="$candidate_state/chat-relay-key" RELAY_CHAT_BACKUP="$backup/candidate-chat.restart.db" "$artifact"
 RELAY_REPLICA_DB_DIGEST="$candidate_state/chat.db" "$artifact" >"$backup/candidate-chat-digest.restart"
+cp -p "$candidate_state/chat.db" "$backup/candidate-chat.restart.db"
 cmp "$backup/live-event-digest.before" "$backup/candidate-event-digest.first"
 cmp "$backup/candidate-event-digest.first" "$backup/candidate-event-digest.restart"
 cmp "$backup/candidate-chat-digest.first" "$backup/candidate-chat-digest.restart"

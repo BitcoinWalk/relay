@@ -3,4 +3,4 @@ a30c1012cf283b00ca847fb08cfcacb71c91b65812d03da7b62ff2b506f7d242  replica-audit-
 7a78fa76d1a299760796d8aeb462c852fb7c62e1fa088116d4869c10a120079d  combined-chat-probe-0.8.98
 97e0e45148014fa8ac21a781bcde311f6faaf108583830497e2d713dbd5347cd  deploy/Dockerfile.london-combined-0.8.98
 ff82cd90311b45b0330c1218ffe8fb09d7b96f0c43b83d15843b588fe47f8ca4  deploy/compose.london-combined-rehearsal-0.8.98.yaml
-06447f188e7c76883de93976e9fe5d1cfe12914fea3c0e7d8a5e61b19f23a992  deploy/rehearse-london-combined-0.8.98.sh
+ceef9ecdae4d810600cb06688907439a65dcd545b6a593bc94b81d7b49c9621b  deploy/rehearse-london-combined-0.8.98.sh
