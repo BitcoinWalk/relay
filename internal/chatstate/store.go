@@ -32,6 +32,7 @@ type State struct {
 	Name       string          `json:"name,omitempty"`
 	About      string          `json:"about,omitempty"`
 	Banner     string          `json:"banner,omitempty"`
+	Picture    string          `json:"picture,omitempty"`
 }
 
 type Record struct {
@@ -214,7 +215,7 @@ func (s *Store) Apply(e nostr.Event, authenticated nostr.PubKey, now time.Time) 
 			}
 		}
 		switch t[0] {
-		case "name", "about", "banner":
+		case "name", "about", "banner", "picture":
 			if e.Kind != 9002 || len(t) != 2 {
 				return errors.New("invalid: metadata tag")
 			}
@@ -227,10 +228,10 @@ func (s *Store) Apply(e nostr.Event, authenticated nostr.PubKey, now time.Time) 
 			if count != 1 {
 				return errors.New("invalid: duplicate metadata tag")
 			}
-			if t[0] == "banner" && t[1] != "" {
+			if (t[0] == "banner" || t[0] == "picture") && t[1] != "" {
 				u, err := url.Parse(t[1])
 				if err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil {
-					return errors.New("invalid: banner must be empty or an HTTPS URL")
+					return fmt.Errorf("invalid: %s must be empty or an HTTPS URL", t[0])
 				}
 			}
 		case "open":
@@ -315,6 +316,9 @@ func (s *Store) Apply(e nostr.Event, authenticated nostr.PubKey, now time.Time) 
 				}
 				if t[0] == "banner" {
 					state.Banner = t[1]
+				}
+				if t[0] == "picture" {
+					state.Picture = t[1]
 				}
 			}
 			action = "metadata"

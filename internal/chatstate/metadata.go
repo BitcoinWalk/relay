@@ -62,6 +62,9 @@ func (s *Store) project(b *bbolt.Bucket, state State, request nostr.Event, now t
 	if state.Banner != "" {
 		info = append(info, nostr.Tag{"banner", state.Banner})
 	}
+	if state.Picture != "" {
+		info = append(info, nostr.Tag{"picture", state.Picture})
+	}
 	sets := []nostr.Tags{
 		info,
 		admins, members,

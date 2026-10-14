@@ -17,13 +17,15 @@ func TestArmadaSettingsBanner(t *testing.T) {
 	defer func() { s.Close() }()
 	apply(t, s, event(t, admin, 9007, "austin"))
 	settings := func(banner string) nostr.Event {
-		return event(t, admin, 9002, "austin", nostr.Tag{"name", "chat"}, nostr.Tag{"about", ""}, nostr.Tag{"banner", banner}, nostr.Tag{"open"})
+		return event(t, admin, 9002, "austin", nostr.Tag{"name", "chat"}, nostr.Tag{"about", ""}, nostr.Tag{"banner", banner}, nostr.Tag{"picture", "https://example.com/avatar.jpg"}, nostr.Tag{"open"})
 	}
 	// Exact settings shape sent by Armada, including an empty banner.
 	apply(t, s, settings(""))
 	apply(t, s, settings("https://example.com/banner.png"))
 	for _, bad := range []nostr.Event{
 		settings("javascript:alert(1)"), settings("http://example.com/a"), settings("https://user:pass@example.com/a"),
+		event(t, admin, 9002, "austin", nostr.Tag{"picture", "javascript:alert(1)"}),
+		event(t, admin, 9002, "austin", nostr.Tag{"picture", "https://example.com/a"}, nostr.Tag{"picture", "https://example.com/b"}),
 		event(t, admin, 9002, "austin", nostr.Tag{"banner"}),
 		event(t, admin, 9002, "austin", nostr.Tag{"banner", ""}, nostr.Tag{"banner", ""}),
 		event(t, member, 9002, "austin", nostr.Tag{"banner", ""}),
@@ -41,20 +43,22 @@ func TestArmadaSettingsBanner(t *testing.T) {
 		t.Helper()
 		found := false
 		err := s.DeliverMetadata(nostr.PubKey{}, nostr.Filter{Kinds: []nostr.Kind{39000}}, func(e nostr.Event) error {
-			name, banner, private, closed := "", "", false, false
+			name, banner, picture, private, closed := "", "", "", false, false
 			for _, tag := range e.Tags {
 				switch tag[0] {
 				case "name":
 					name = tag[1]
 				case "banner":
 					banner = tag[1]
+				case "picture":
+					picture = tag[1]
 				case "private":
 					private = true
 				case "closed":
 					closed = true
 				}
 			}
-			if name != "chat" || banner != want || private || closed {
+			if name != "chat" || banner != want || picture != "https://example.com/avatar.jpg" || private || closed {
 				t.Fatalf("incorrect metadata: %v", e.Tags)
 			}
 			found = true
