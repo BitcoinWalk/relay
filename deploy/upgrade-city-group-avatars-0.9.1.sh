@@ -47,6 +47,7 @@ trap rollback EXIT HUP INT TERM
 
 systemctl stop "$unit"
 RELAY_CHAT_DB="$database" RELAY_CHAT_KEY_FILE="$key" RELAY_CHAT_BACKUP="$backup/chat.before.db" "$target"
+RELAY_REPLICA_DB_DIGEST="$backup/chat.before.db" "$artifact" >"$backup/chat.before.logical-digest"
 changed=1
 install -o root -g root -m 0755 "$artifact" "$target"
 systemctl start "$unit"
@@ -70,7 +71,8 @@ PY
 
 systemctl stop "$unit"
 RELAY_CHAT_DB="$database" RELAY_CHAT_KEY_FILE="$key" RELAY_CHAT_BACKUP="$backup/chat.activated.db" "$target"
-cmp "$backup/chat.before.db" "$backup/chat.activated.db"
+RELAY_REPLICA_DB_DIGEST="$backup/chat.activated.db" "$artifact" >"$backup/chat.activated.logical-digest"
+cmp "$backup/chat.before.logical-digest" "$backup/chat.activated.logical-digest"
 systemctl start "$unit"
 
 attempt=0
@@ -94,6 +96,7 @@ systemctl is-active --quiet "$unit"
 (
   cd "$backup"
   sha256sum bitcoinwalk-relay.before relay-key.recovery service.before chat.before.db chat.activated.db \
+    chat.before.logical-digest chat.activated.logical-digest \
     nip11.before.json nip11.activated.json nip11.restart.json health.activated.json health.restart.json >SHA256SUMS
 )
 complete=1
