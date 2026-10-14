@@ -6,7 +6,7 @@ set -eu
 test "$(id -u)" -eq 0 || { echo 'Run with sudo on the relay host.' >&2; exit 1; }
 cd "$(dirname "$0")/.."
 
-artifact=bitcoinwalk-relay-city-groups-0.9.1
+artifact=./bitcoinwalk-relay-city-groups-0.9.1
 target=/opt/bitcoinwalk-chat-staging/bitcoinwalk-relay
 database=/var/lib/bitcoinwalk-chat-staging/chat.db
 key=/etc/bitcoinwalk-chat-staging/relay-key
