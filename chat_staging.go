@@ -52,7 +52,7 @@ func runChat() error {
 	if mode == "production" {
 		r.Info.Name = "BitcoinWalk Community"
 		r.Info.Description = "The members-only global community relay for free-tier BitcoinWalk cities."
-		r.Info.Version = "bitcoinwalk-chat-0.3.0"
+		r.Info.Version = "bitcoinwalk-chat-shared-0.9.1"
 	} else if mode == "city" {
 		name := os.Getenv("RELAY_CHAT_NAME")
 		if name == "" {
