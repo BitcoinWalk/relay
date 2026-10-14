@@ -4,9 +4,12 @@ import (
 	"fiatjaf.com/nostr"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestMultiHistoryIsolationAndTotalLimit(t *testing.T) {
+	base := now
+	defer func() { now = base }()
 	admin, user := nostr.Generate(), nostr.Generate()
 	s, err := OpenSigned(filepath.Join(t.TempDir(), "chat.db"), nostr.GetPublicKey(admin), nostr.Generate())
 	if err != nil {
@@ -18,6 +21,7 @@ func TestMultiHistoryIsolationAndTotalLimit(t *testing.T) {
 		apply(t, s, event(t, admin, 9, id))
 	}
 	for _, id := range []string{"a", "c"} {
+		now = now.Add(time.Second)
 		apply(t, s, event(t, user, 9021, id))
 	}
 	f := nostr.Filter{Kinds: []nostr.Kind{9}, Tags: nostr.TagMap{"h": []string{"b", "a", "c", "missing"}}, Limit: 1}
@@ -40,8 +44,10 @@ func TestMultiHistoryIsolationAndTotalLimit(t *testing.T) {
 	read(1)
 	f.Limit = 200
 	read(2)
+	now = now.Add(time.Second)
 	apply(t, s, event(t, user, 9022, "a"))
 	read(1)
+	now = now.Add(time.Second)
 	apply(t, s, event(t, user, 9022, "c"))
 	read(0)
 }
