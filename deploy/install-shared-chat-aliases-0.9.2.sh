@@ -34,14 +34,16 @@ replacement='''\t\thandle /join-chat {
 \t\t\tredir https://armada.buzz/s/chat.bitcoinwalk.org/13bc3a423b4f2954 302
 \t\t}
 \t\thandle /chat {
-\t\t\tredir https://armada.buzz/s/chat.bitcoinwalk.org/13bc3a423b4f2954 302
+\t\t\theader Content-Type "text/html; charset=utf-8"
+\t\t\trespond "<!doctype html><html lang='en'><meta name='viewport' content='width=device-width,initial-scale=1'><title>BitcoinWalk Global · Walkie Talkie</title><body><main><h1>BitcoinWalk Global</h1><p>Open the global channel in the Walkie Talkie app.</p><p><a href='walkietalkie://community?scope=global'>Open Walkie Talkie</a></p><p>This link is for Walkie Talkie. Armada and Concord use their existing BitcoinWalk community links.</p></main></body></html>" 200
 \t\t}
 \t\t@city_chat {
 \t\t\tmethod GET HEAD
 \t\t\tpath_regexp city ^/([a-z0-9]+(?:-[a-z0-9]+)*)/?$
 \t\t}
 \t\thandle @city_chat {
-\t\t\tredir https://armada.buzz/s/chat.bitcoinwalk.org/bitcoinwalk-{re.city.1} 302
+\t\t\theader Content-Type "text/html; charset=utf-8"
+\t\t\trespond "<!doctype html><html lang='en'><meta name='viewport' content='width=device-width,initial-scale=1'><title>BitcoinWalk {re.city.1} · Walkie Talkie</title><body><main><h1>BitcoinWalk {re.city.1}</h1><p>Open this city channel in the Walkie Talkie app.</p><p><a href='walkietalkie://community?scope=city&city={re.city.1}'>Open Walkie Talkie</a></p><p>This link does not change the city's Armada or Concord relay.</p></main></body></html>" 200
 \t\t}
 \t\thandle {
 \t\t\trespond "BitcoinWalk community relay. Open the official city or Global chat link from BitcoinWalk." 404
@@ -65,8 +67,10 @@ trap restore EXIT
 
 install -o root -g root -m 0644 "$candidate" "$caddyfile"
 systemctl reload "$service"
-test "$(curl -sS --max-time 10 -o /dev/null -w '%{redirect_url}' https://chat.bitcoinwalk.org/chat)" = "https://armada.buzz/s/chat.bitcoinwalk.org/13bc3a423b4f2954"
-test "$(curl -sS --max-time 10 -o /dev/null -w '%{redirect_url}' https://chat.bitcoinwalk.org/madeira)" = "https://armada.buzz/s/chat.bitcoinwalk.org/bitcoinwalk-madeira"
+test "$(curl -sS --max-time 10 -o /dev/null -w '%{http_code}' https://chat.bitcoinwalk.org/chat)" = "200"
+curl -fsS --max-time 10 https://chat.bitcoinwalk.org/chat | grep -F 'walkietalkie://community?scope=global' >/dev/null
+test "$(curl -sS --max-time 10 -o /dev/null -w '%{http_code}' https://chat.bitcoinwalk.org/madeira)" = "200"
+curl -fsS --max-time 10 https://chat.bitcoinwalk.org/madeira | grep -F 'walkietalkie://community?scope=city&city=madeira' >/dev/null
 curl -fsS --max-time 10 -H 'Accept: application/nostr+json' https://chat.bitcoinwalk.org/ >"$backup/nip11.after.json"
 python3 - "$backup/nip11.after.json" <<'PY'
 import json,sys
@@ -81,4 +85,4 @@ sha256sum "$backup/Caddyfile.before" "$candidate" "$backup/nip11.after.json" >"$
 accepted=1
 trap - EXIT
 echo "Shared city chat aliases 0.9.2 accepted. Backup: $backup"
-echo "Human links use https://chat.bitcoinwalk.org/<city>; the Nostr relay remains wss://chat.bitcoinwalk.org/ with group bitcoinwalk-<city>."
+echo "Walkie Talkie links use https://chat.bitcoinwalk.org/<city>; Pro-city Armada and Concord relays remain unchanged."
