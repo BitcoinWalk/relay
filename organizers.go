@@ -49,12 +49,23 @@ type cityDraft struct {
 // The two creator fields extend the web app's not-yet-published authorization schema.
 // The original submitted event proves which public key created this city.
 type cityGrant struct {
+	Version           int      `json:"version,omitempty"`
 	CityID            string   `json:"cityId"`
 	EditorPubkeys     []string `json:"editorPubkeys"`
 	SuperAdminPubkey  string   `json:"superAdminPubkey"`
 	CreatorPubkey     string   `json:"creatorPubkey"`
 	CreatorRevisionID string   `json:"creatorRevisionId"`
+	OwnerPubkey       string   `json:"ownerPubkey,omitempty"`
+	OwnershipEventID  string   `json:"ownershipEventId,omitempty"`
 }
+
+func (g cityGrant) owner() string {
+	if g.OwnerPubkey != "" {
+		return g.OwnerPubkey
+	}
+	return g.CreatorPubkey
+}
+
 type cityDecision struct {
 	CityID          string   `json:"cityId"`
 	RevisionID      string   `json:"cityRevisionId"`
@@ -170,7 +181,7 @@ func (p *organizerPolicy) grant(cityID string) (*cityGrant, *nostr.Event, error)
 	return &grant, event, nil
 }
 func (p *organizerPolicy) canEdit(key nostr.PubKey, grant *cityGrant) bool {
-	return key == p.admin || grant != nil && (key.Hex() == grant.CreatorPubkey || slices.Contains(grant.EditorPubkeys, key.Hex()))
+	return key == p.admin || grant != nil && slices.Contains(grant.EditorPubkeys, key.Hex())
 }
 
 func (p *organizerPolicy) latestDecision(cityID string) *nostr.Event {
@@ -342,8 +353,17 @@ func (p *organizerPolicy) check(ctx context.Context, event nostr.Event) error {
 				return errors.New("invalid: editor public key")
 			}
 		}
-		if !slices.Contains(grant.EditorPubkeys, grant.CreatorPubkey) {
-			return errors.New("restricted: creator must remain a city editor")
+		transferred := grant.Version != 0 || grant.OwnerPubkey != "" || grant.OwnershipEventID != ""
+		if transferred {
+			if grant.Version != 2 || grant.OwnerPubkey == "" || grant.OwnershipEventID == "" || !hexKeyPattern.MatchString(grant.OwnershipEventID) {
+				return errors.New("invalid: transferred ownership requires complete v2 evidence")
+			}
+			if _, err := nostr.PubKeyFromHex(grant.OwnerPubkey); err != nil {
+				return errors.New("invalid: owner public key")
+			}
+		}
+		if !slices.Contains(grant.EditorPubkeys, grant.owner()) {
+			return errors.New("restricted: current owner must remain a city editor")
 		}
 		old, oldEvent, err := p.grant(grant.CityID)
 		if err != nil {
@@ -353,10 +373,20 @@ func (p *organizerPolicy) check(ctx context.Context, event nostr.Event) error {
 			if old.CreatorPubkey != grant.CreatorPubkey || old.CreatorRevisionID != grant.CreatorRevisionID {
 				return errors.New("restricted: city creator cannot be reassigned")
 			}
+			if old.owner() != grant.owner() {
+				if !transferred || grant.OwnershipEventID == old.OwnershipEventID {
+					return errors.New("restricted: owner change requires new signed directory evidence")
+				}
+			} else if old.OwnerPubkey != grant.OwnerPubkey || old.OwnershipEventID != grant.OwnershipEventID || old.Version != grant.Version {
+				return errors.New("restricted: ownership evidence cannot change without an owner change")
+			}
 			if event.ID != oldEvent.ID && event.CreatedAt <= oldEvent.CreatedAt {
 				return errors.New("invalid: editor list must be newer than current authorization")
 			}
 		} else {
+			if transferred {
+				return errors.New("restricted: initial authorization must use the original creator")
+			}
 			original := p.byID(grant.CreatorRevisionID)
 			if original == nil || original.Kind != 30303 || original.PubKey.Hex() != grant.CreatorPubkey {
 				return errors.New("invalid: creator must match the referenced submission")

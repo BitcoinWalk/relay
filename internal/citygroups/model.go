@@ -21,9 +21,12 @@ const SuperAdmin = "super-admin"
 var uuid = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
 
 type LegacyGrant struct {
+	Version           int      `json:"version,omitempty"`
 	CityID            string   `json:"cityId"`
 	CreatorPubkey     string   `json:"creatorPubkey"`
 	CreatorRevisionID string   `json:"creatorRevisionId"`
+	OwnerPubkey       string   `json:"ownerPubkey,omitempty"`
+	OwnershipEventID  string   `json:"ownershipEventId,omitempty"`
 	EditorPubkeys     []string `json:"editorPubkeys"`
 	SuperAdminPubkey  string   `json:"superAdminPubkey"`
 }
@@ -31,6 +34,7 @@ type LegacyGrant struct {
 type Seed struct {
 	CityID            string          `json:"cityId"`
 	Creator           nostr.PubKey    `json:"creator"`
+	Owner             nostr.PubKey    `json:"owner"`
 	CreatorRevisionID string          `json:"creatorRevisionId"`
 	SourceID          nostr.ID        `json:"sourceAuthorizationId"`
 	SourceTimestamp   nostr.Timestamp `json:"sourceTimestamp"`
@@ -71,6 +75,16 @@ func SeedFromGrant(event nostr.Event, admin nostr.PubKey) (Seed, error) {
 	if _, err := nostr.IDFromHex(grant.CreatorRevisionID); err != nil {
 		return seed, errors.New("invalid original revision id")
 	}
+	owner := creator
+	if grant.OwnerPubkey != "" {
+		owner, err = nostr.PubKeyFromHex(grant.OwnerPubkey)
+		if err != nil || grant.Version != 2 {
+			return seed, errors.New("invalid transferred owner")
+		}
+		if _, err = nostr.IDFromHex(grant.OwnershipEventID); err != nil {
+			return seed, errors.New("invalid ownership event")
+		}
+	}
 	if len(grant.EditorPubkeys) < 1 || len(grant.EditorPubkeys) > 100 {
 		return seed, errors.New("invalid editor count")
 	}
@@ -84,8 +98,8 @@ func SeedFromGrant(event nostr.Event, admin nostr.PubKey) (Seed, error) {
 			editors = append(editors, key)
 		}
 	}
-	if !slices.Contains(editors, creator) {
-		return seed, errors.New("creator missing from editor list")
+	if !slices.Contains(editors, owner) {
+		return seed, errors.New("owner missing from editor list")
 	}
 	slices.SortFunc(editors, func(a, b nostr.PubKey) int {
 		if a.Hex() < b.Hex() {
@@ -96,7 +110,7 @@ func SeedFromGrant(event nostr.Event, admin nostr.PubKey) (Seed, error) {
 		}
 		return 1
 	})
-	return Seed{CityID: grant.CityID, Creator: creator, CreatorRevisionID: grant.CreatorRevisionID, SourceID: event.ID, SourceTimestamp: event.CreatedAt, Admin: admin, Editors: editors}, nil
+	return Seed{CityID: grant.CityID, Creator: creator, Owner: owner, CreatorRevisionID: grant.CreatorRevisionID, SourceID: event.ID, SourceTimestamp: event.CreatedAt, Admin: admin, Editors: editors}, nil
 }
 
 // SelectSeeds resolves addressable authorizations using NIP-01 ordering, rather
@@ -150,7 +164,7 @@ func (s Seed) Group(relayURL string, relayKey nostr.PubKey, now nostr.Timestamp)
 	for _, key := range s.Editors {
 		group.Members[key] = []*nip29.Role{{Name: Organizer}}
 	}
-	group.Members[s.Creator] = []*nip29.Role{{Name: Owner}}
+	group.Members[s.Owner] = []*nip29.Role{{Name: Owner}}
 	group.Members[s.Admin] = append(group.Members[s.Admin], &nip29.Role{Name: SuperAdmin})
 	return group
 }

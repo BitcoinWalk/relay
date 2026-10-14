@@ -226,6 +226,23 @@ func TestOrganizerLifecycle(t *testing.T) {
 	})
 }
 
+func TestOrganizerOwnershipTransferPreservesCreatorWithoutRetainingAccess(t *testing.T) {
+	admin, creator, nextOwner := nostr.Generate(), nostr.Generate(), nostr.Generate()
+	adminPK, creatorPK, nextPK := nostr.GetPublicKey(admin), nostr.GetPublicKey(creator), nostr.GetPublicKey(nextOwner)
+	relay, db, err := newRelay(filepath.Join(t.TempDir(), "events.db"), map[nostr.PubKey]bool{adminPK: true})
+	if err != nil { t.Fatal(err) }
+	defer func(){relay.DisableExpirationManager();db.Close()}()
+	unitOrganizerPolicy(relay,enableOrganizers(relay,db,adminPK))
+	proposal:=draftEvent(t,creator,cityA,0);accept(t,relay,proposal)
+	legacy:=cityGrant{CityID:cityA,CreatorPubkey:creatorPK.Hex(),CreatorRevisionID:proposal.ID.Hex(),EditorPubkeys:[]string{creatorPK.Hex()},SuperAdminPubkey:adminPK.Hex()}
+	accept(t,relay,workflowEvent(t,admin,30302,legacy,nostr.Tags{{"d",cityA}},1))
+	transfer:=legacy;transfer.Version=2;transfer.OwnerPubkey=nextPK.Hex();transfer.OwnershipEventID=strings.Repeat("a",64);transfer.EditorPubkeys=[]string{nextPK.Hex()}
+	accept(t,relay,workflowEvent(t,admin,30302,transfer,nostr.Tags{{"d",cityA}},2))
+	accept(t,relay,draftEvent(t,nextOwner,cityA,3))
+	deny(t,relay,draftEvent(t,creator,cityA,3))
+	bad:=transfer;bad.CreatorPubkey=nextPK.Hex();deny(t,relay,workflowEvent(t,admin,30302,bad,nostr.Tags{{"d",cityA}},4))
+}
+
 func TestOrganizerValidation(t *testing.T) {
 	admin, creator := nostr.Generate(), nostr.Generate()
 	adminPK := nostr.GetPublicKey(admin)
