@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -48,10 +49,13 @@ func (s *Store) VerifyRecovery() error {
 				}
 				// Re-evaluate historical commands at their signing time. This
 				// bypasses only today's freshness window, not signatures/authority.
-				return replay.Apply(record.Event, record.Event.PubKey, time.Unix(int64(record.Event.CreatedAt), 0))
+				if err := replay.apply(record.Event, record.Event.PubKey, time.Unix(int64(record.Event.CreatedAt), 0), true); err != nil {
+					return fmt.Errorf("group %q sequence %d action %q: %w", string(id), record.Sequence, record.Action, err)
+				}
+				return nil
 			})
 			if err != nil {
-				return errors.New("recovery: signed audit replay failed")
+				return fmt.Errorf("recovery: signed audit replay failed: %w", err)
 			}
 			if err := replay.db.View(func(other *bbolt.Tx) error {
 				derived := other.Bucket(groups).Bucket(id)

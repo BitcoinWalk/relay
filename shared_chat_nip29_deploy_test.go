@@ -10,7 +10,7 @@ import (
 
 func TestSharedChatNIP29ReleaseIsGuarded(t *testing.T) {
 	want := map[string]string{
-		"bitcoinwalk-chat-shared-0.9.1": "e473472bde1474d13fe7a761bf97528b3d3f7ec1a461b5cabf517cd4e9fcb751",
+		"bitcoinwalk-chat-shared-0.9.2": "08d214ff14600754eef76eb04ad9ad95092d9735ddc5d64307ae87b8d120c99a",
 		"chat-public-audit-0.9.1":       "80b42ccd463d9f5d901378dac0d793006f09876e2420316351be004cd06dcb89",
 	}
 	for path, expected := range want {
@@ -22,7 +22,7 @@ func TestSharedChatNIP29ReleaseIsGuarded(t *testing.T) {
 			t.Fatalf("%s digest = %s", path, got)
 		}
 	}
-	script, err := os.ReadFile("deploy/upgrade-shared-chat-nip29-0.9.2.sh")
+	script, err := os.ReadFile("deploy/upgrade-shared-chat-nip29-0.9.3.sh")
 	if err != nil {
 		t.Fatal(err)
 	}

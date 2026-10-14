@@ -2,9 +2,25 @@ package chatstate
 
 import (
 	"encoding/json"
+	"fiatjaf.com/nostr"
 	"go.etcd.io/bbolt"
 	"testing"
 )
+
+func TestRecoveryReplaysLegacyPrivateVisibilityWithoutAllowingNewWrites(t *testing.T) {
+	s, admin, _ := openTest(t)
+	legacy := event(t, admin, 9002, "city-a", nostr.Tag{"visibility", "private"})
+	if err := s.apply(legacy, legacy.PubKey, now, true); err != nil {
+		t.Fatal("prepare legacy signed history", err)
+	}
+	current := event(t, admin, 9002, "city-a", nostr.Tag{"visibility", "private"})
+	if err := s.Apply(current, current.PubKey, now); err == nil {
+		t.Fatal("live write accepted legacy private visibility")
+	}
+	if err := s.VerifyRecovery(); err != nil {
+		t.Fatal("legacy signed history did not replay", err)
+	}
+}
 
 func TestRecoveryRejectsAuthorityTampering(t *testing.T) {
 	s, _, _ := openTest(t)

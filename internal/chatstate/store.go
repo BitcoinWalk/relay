@@ -182,6 +182,14 @@ func save(b *bbolt.Bucket, state State) error {
 // bitcoinwalk-unban=true clears a ban without adding membership. These are
 // explicit local policies, not standardized NIP-29 ban operations.
 func (s *Store) Apply(e nostr.Event, authenticated nostr.PubKey, now time.Time) error {
+	return s.apply(e, authenticated, now, false)
+}
+
+// apply permits the recovery verifier to replay visibility markers that were
+// valid when an older signed command was committed. Live writes always pass
+// allowLegacyVisibility=false, so the current public/open policy remains
+// deny-by-default at the transport boundary.
+func (s *Store) apply(e nostr.Event, authenticated nostr.PubKey, now time.Time, allowLegacyVisibility bool) error {
 	if e.PubKey != authenticated {
 		return errors.New("auth-required: authenticate as author")
 	}
@@ -238,8 +246,14 @@ func (s *Store) Apply(e nostr.Event, authenticated nostr.PubKey, now time.Time) 
 			if e.Kind != 9002 || len(t) != 1 {
 				return errors.New("invalid: metadata flag")
 			}
-		case "private", "restricted", "visibility":
-			return errors.New("restricted: public open-join metadata required")
+		case "private", "restricted":
+			if !allowLegacyVisibility || e.Kind != 9002 || len(t) != 1 {
+				return errors.New("restricted: public open-join metadata required")
+			}
+		case "visibility":
+			if !allowLegacyVisibility || e.Kind != 9002 || len(t) != 2 || t[1] != "private" {
+				return errors.New("restricted: public open-join metadata required")
+			}
 		case "h":
 		case "client":
 			if _, err := tag(e, "client", false); err != nil {
