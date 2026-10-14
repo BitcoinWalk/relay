@@ -22,13 +22,16 @@ func TestSharedChatNIP29ReleaseIsGuarded(t *testing.T) {
 			t.Fatalf("%s digest = %s", path, got)
 		}
 	}
-	script, err := os.ReadFile("deploy/upgrade-shared-chat-nip29-0.9.1.sh")
+	script, err := os.ReadFile("deploy/upgrade-shared-chat-nip29-0.9.2.sh")
 	if err != nil {
 		t.Fatal(err)
 	}
 	text := string(script)
 	for _, required := range []string{
 		"Unexpected installed chat binary",
+		"dd7a61a18b9cc6052b359e858116fabf6e34707ba92b45d39ccd5a30a9fcea86",
+		"Public chat URL setting is missing or duplicated",
+		"grep -Fx 'RELAY_CHAT_URL=wss://chat.bitcoinwalk.org'",
 		"chat.pre-rehearsal.db",
 		"RELAY_CHAT_LISTEN=127.0.0.1:3399",
 		"cmp \"$backup/public.before.json\" \"$backup/candidate.public.json\"",
