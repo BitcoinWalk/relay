@@ -80,6 +80,18 @@ func TestApprovedInitialWalkIsReleasedAndReplicatedImmediately(t *testing.T) {
 	if err != nil || !found || row.Status != "acknowledged" || row.Attempts != 1 || row.Envelope == nil {
 		t.Fatalf("released first walk was not acknowledged: %#v %v", row, err)
 	}
+	// A later addressable occurrence can replace the initial walk in the source
+	// store. The exact signed initial event remains in the durable journal and
+	// must keep restart reconciliation possible.
+	if err := sourceDB.DeleteEvent(initial.ID); err != nil {
+		t.Fatal(err)
+	}
+	if source.byID(initial.ID.Hex()) != nil {
+		t.Fatal("superseded initial walk remained in the source store")
+	}
+	if recovered, err := source.recoverReplicaJournal(journal); err != nil || recovered != 0 {
+		t.Fatalf("restart reconciliation failed after initial-walk replacement: recovered=%d err=%v", recovered, err)
+	}
 	serviceEvent := nostr.Event{}
 	serviceEvent.Sign(service)
 	scope := replicaScope{CityID: cityA, ServiceKey: service.Public(), Destination: destination}

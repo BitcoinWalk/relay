@@ -1,0 +1,6 @@
+a585c8845a4f99753f4bd47fc3baaf28b547d8d653c06ed5e2f2553739a361b0  bitcoinwalk-relay-production-reconciliation-0.9.6
+fccb274ac6157149fa26693019d8028cfcca56f86416dba258b5e905d8a9d296  bitcoinwalk-relay-production-additive-0.8.85
+4096cd82f543d324eb63489a7ef3df1862fec1471c55db77831093a90f958234  replica-audit-production-additive-0.8.85
+4be903d419a53a5d71d52c3b89d6c36c9f5395bf3873c8dc3306a1ef97bf83b2  deploy/99-production-reconciliation-version-0.9.6.conf
+c7be806d427d79a5d010fc57142d0ad6fc9c0cde056834ed5fdc02e3f0b52929  deploy/recover-production-relay-0.9.6.sh
+b9558e8fd1cf5ad21903568ea633ffefd41e3dfd2d1efad5189e8989f81fc4f3  deploy/recover-and-promote-lugano-production-0.9.6.sh
