@@ -1,0 +1,4 @@
+ad57b4e060e98f082ef7487f16925e35ac3d9b313e8e881d1e62d3ee1e84008c  bitcoinwalk-relay-production-approved-image-0.8.98
+ca1d1fc8a7bad52901dbe003baaad665f923b69b658d05b35c15a8386ffd5ccd  replica-audit-production-approved-image-0.8.98
+c56c727c935065faf2582635fc700ec1b2b5f579bbdd3a718a435f64e585d97a  deploy/99-production-approved-image-version-0.8.98.conf
+9d0136d8b7db648659259d92a7cbcb7c70cec12b00297d316ad042db01a428e7  deploy/install-production-approved-image-policy-0.8.98.sh

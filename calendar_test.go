@@ -190,7 +190,8 @@ func TestOrganizerOccurrencePublishingAndModeration(t *testing.T) {
 	accept(t, relay, revision)
 	grant := cityGrant{CityID: cityA, CreatorPubkey: creatorPK.Hex(), CreatorRevisionID: revision.ID.Hex(), EditorPubkeys: []string{creatorPK.Hex(), editorPK.Hex()}, SuperAdminPubkey: adminPK.Hex()}
 	accept(t, relay, workflowEvent(t, admin, 30302, grant, nostr.Tags{{"d", cityA}}, 1))
-	approval := workflowEvent(t, admin, 30304, cityDecision{CityID: cityA, RevisionID: revision.ID.Hex(), Status: "approved"}, nostr.Tags{{"d", cityA}, {"e", revision.ID.Hex(), "", "city-revision"}, {"status", "approved"}}, 2)
+	approvedHeroImage := "https://bitcoinwalk.org/api/media/files/" + strings.Repeat("a", 64) + ".webp"
+	approval := workflowEvent(t, admin, 30304, cityDecision{CityID: cityA, RevisionID: revision.ID.Hex(), HeroImageURL: approvedHeroImage, Status: "approved"}, nostr.Tags{{"d", cityA}, {"e", revision.ID.Hex(), "", "city-revision"}, {"status", "approved"}}, 2)
 	accept(t, relay, approval)
 	occurrence := func(key nostr.SecretKey, offset int) nostr.Event {
 		city, e := parseDraft(revision)
@@ -199,7 +200,7 @@ func TestOrganizerOccurrencePublishingAndModeration(t *testing.T) {
 		}
 		start := time.Now().Add(48 * time.Hour).Unix()
 		event := nostr.Event{Kind: 31923, CreatedAt: nostr.Now() + nostr.Timestamp(offset), Content: city.Description, Tags: nostr.Tags{
-			{"d", "123e4567-e89b-42d3-a456-426614174000:2026-09-22"}, {"title", "BitcoinWalk " + city.CityName}, {"summary", "BitcoinWalk in " + city.CityName}, {"image", city.HeroImageURL},
+			{"d", "123e4567-e89b-42d3-a456-426614174000:2026-09-22"}, {"title", "BitcoinWalk " + city.CityName}, {"summary", "BitcoinWalk in " + city.CityName}, {"image", approvedHeroImage},
 			{"start", strconv.FormatInt(start, 10)}, {"D", strconv.FormatInt(start/86400, 10)}, {"location", "Outside the library"}, {"location", "1.5,2.5"}, {"g", encodeGeohash(1.5, 2.5)}, {"t", "bitcoinwalk"}, {"r", city.ChatURL},
 			{"end", strconv.FormatInt(start+3600, 10)}, {"start_tzid", "UTC"}, {"end_tzid", "UTC"}, {"i", cityA}, {"bitcoinwalk", "occurrence-v1"},
 			{"e", revision.ID.Hex(), "", "city-revision"}, {"e", approval.ID.Hex(), "", "city-approval"},

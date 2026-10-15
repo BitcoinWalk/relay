@@ -534,6 +534,10 @@ func (p *organizerPolicy) checkOrganizerCalendar(event nostr.Event, writing bool
 	if json.Unmarshal([]byte(approval.Content), &decision) != nil || decision.CityID != cityID || decision.RevisionID != revisionID || decision.Status != "approved" {
 		return errors.New("invalid: occurrence approval mismatch")
 	}
+	approvedHeroImage := city.HeroImageURL
+	if decision.HeroImageURL != "" {
+		approvedHeroImage = decision.HeroImageURL
+	}
 	current := p.currentApproval(cityID)
 	if current == nil {
 		return errors.New("restricted: city is not currently approved")
@@ -563,8 +567,8 @@ func (p *organizerPolicy) checkOrganizerCalendar(event nostr.Event, writing bool
 		}
 		expected["image"] = image
 		expected["bitcoinwalk-image"] = imageMarker
-	} else if city.HeroImageURL != "" {
-		expected["image"] = city.HeroImageURL
+	} else if approvedHeroImage != "" {
+		expected["image"] = approvedHeroImage
 	} else if hasImage {
 		return errors.New("restricted: occurrence image differs from approved city")
 	}
@@ -613,7 +617,7 @@ func (p *organizerPolicy) checkOrganizerCalendar(event nostr.Event, writing bool
 	}
 	locations, references, eCount := []string{}, []string{}, 0
 	allowed := map[string]bool{"d": true, "i": true, "bitcoinwalk": true, "title": true, "summary": true, "start": true, "end": true, "D": true, "start_tzid": true, "end_tzid": true, "t": true, "g": true}
-	if city.HeroImageURL != "" || hasImageMarker {
+	if approvedHeroImage != "" || hasImageMarker {
 		allowed["image"] = true
 	}
 	if hasImageMarker {
