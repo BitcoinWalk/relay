@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "cities": [
+    {
+      "cityId": "7877ca26-dbe2-4dae-a7f7-483d94ce283a",
+      "slug": "lugano",
+      "tier": "free",
+      "revisionId": "0010e95112691d97cb62086eae1e4a77d4a3c15dfa99ec30f39b33655e9cf5d8",
+      "approvalId": "45424b887a2e20da23bef6eb72aebaeb89330b1e1ca4518cde9205cfe5b4e767"
+    }
+  ]
+}
