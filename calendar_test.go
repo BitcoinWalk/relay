@@ -253,6 +253,25 @@ func TestOrganizerOccurrencePublishingAndModeration(t *testing.T) {
 	if policy.checkReplicaOccurrence(serviceCtx, tampered, scope) == nil {
 		t.Fatal("tampered replica accepted")
 	}
+	contentImage := "https://app-staging.bitcoinwalk.org/api/media/files/" + strings.Repeat("b", 64) + ".webp"
+	withContentImage := occurrence(editor, 3)
+	withContentImage.Tags = append(withContentImage.Tags, nostr.Tag{"bitcoinwalk-content-image", contentImage})
+	withContentImage.Sign(editor)
+	if err := policy.checkOrganizerCalendar(withContentImage, true); err != nil {
+		t.Fatalf("managed occurrence content image rejected: %v", err)
+	}
+	badContentImage := occurrence(editor, 3)
+	badContentImage.Tags = append(badContentImage.Tags, nostr.Tag{"bitcoinwalk-content-image", "https://example.com/walk.jpg"})
+	badContentImage.Sign(editor)
+	if policy.checkOrganizerCalendar(badContentImage, true) == nil {
+		t.Fatal("unmanaged occurrence content image accepted")
+	}
+	duplicateContentImage := withContentImage
+	duplicateContentImage.Tags = append(duplicateContentImage.Tags, nostr.Tag{"bitcoinwalk-content-image", contentImage})
+	duplicateContentImage.Sign(editor)
+	if policy.checkOrganizerCalendar(duplicateContentImage, true) == nil {
+		t.Fatal("duplicate occurrence content image accepted")
+	}
 	event := occurrence(editor, 3)
 	if _, err := policy.exportReplicaBundle(cityA, event.ID.Hex()); err == nil {
 		t.Fatal("exported event before source acceptance")

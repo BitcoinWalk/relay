@@ -572,6 +572,13 @@ func (p *organizerPolicy) checkOrganizerCalendar(event nostr.Event, writing bool
 	} else if hasImage {
 		return errors.New("restricted: occurrence image differs from approved city")
 	}
+	contentImage, hasContentImage := exactCalendarTag(event, "bitcoinwalk-content-image")
+	if hasContentImage {
+		if !managedWalkImagePattern.MatchString(contentImage) {
+			return errors.New("invalid: occurrence content image")
+		}
+		expected["bitcoinwalk-content-image"] = contentImage
+	}
 	for name, value := range expected {
 		actual, ok := exactCalendarTag(event, name)
 		if !ok || actual != value {
@@ -622,6 +629,9 @@ func (p *organizerPolicy) checkOrganizerCalendar(event nostr.Event, writing bool
 	}
 	if hasImageMarker {
 		allowed["bitcoinwalk-image"] = true
+	}
+	if hasContentImage {
+		allowed["bitcoinwalk-content-image"] = true
 	}
 	routeMarker, hasRouteMarker := exactCalendarTag(event, "bitcoinwalk-route")
 	if hasRouteMarker {
