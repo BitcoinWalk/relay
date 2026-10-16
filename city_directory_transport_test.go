@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"net/http"
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
@@ -84,6 +85,33 @@ func TestCityDirectoryTransportPublicReadAndAuthenticatedWrite(t *testing.T) {
 	ownerUpdate := directoryEvent(t, owner, ownerUpdateContent, 2)
 	if err := writer.Publish(ctx, ownerUpdate); err != nil {
 		t.Fatalf("current endpoint operator could not transport exact owner-signed successor: %v", err)
+	}
+}
+
+func TestCityDirectoryTransportUsesReadAppropriateConnectionBudget(t *testing.T) {
+	anchors, bundle, _, _, root, _ := directoryTransportFixture(t)
+	relay, db, err := newRelay(filepath.Join(t.TempDir(), "directory.db"), map[nostr.PubKey]bool{root.PubKey: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer relay.DisableExpirationManager()
+	defer db.Close()
+	relay.RejectConnection = func(*http.Request) bool { return true }
+	if _, err := configureCityDirectoryTransport(relay, db, anchors, bundle, cityA, "staging"); err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(http.MethodGet, "http://directory.example/", nil)
+	request.RemoteAddr = "203.0.113.8:49152"
+	for attempt := 0; attempt < cityDirectoryConnectionBurst; attempt++ {
+		if relay.RejectConnection(request) {
+			t.Fatalf("read connection %d was rejected before the documented burst was exhausted", attempt+1)
+		}
+	}
+	if !relay.RejectConnection(request) {
+		t.Fatal("connection limiter did not retain a finite burst")
+	}
+	if cityDirectoryConnectionRefill != 20 || cityDirectoryConnectionWindow != time.Minute {
+		t.Fatal("directory connection refill no longer matches the strict filter budget")
 	}
 }
 

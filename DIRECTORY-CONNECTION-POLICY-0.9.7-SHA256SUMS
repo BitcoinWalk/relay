@@ -1,0 +1,5 @@
+f3825df40c1826bc2dcbc02ee34f53cabd7ea70b852ca82d8c7d49c5c85b1e90  bitcoinwalk-relay-directory-connection-0.9.7
+e0f2cfdcebd5e1a8ae9e74221a66584b70875c825da36382a655922ab6c86228  deploy/compose.directory-2-staging-0.9.7.yaml
+5805c75a54e64116f0639f2bf95f0a9316c1038a725a5b90d59c4e4234c15980  deploy/Dockerfile.directory-2-staging
+407be4533ab02ca00668524605253feda3fd6634e7ad8f12e3b6cafec70658bb  deploy/capture-city-directory-root-0.8.39.py
+6ac6d37e1f8d6092abf34fcdb97b9e0c91e74476740f1b2f20f840b347a032a8  deploy/install-directory-connection-policy-0.9.7.sh

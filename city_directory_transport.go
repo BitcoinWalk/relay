@@ -5,14 +5,27 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"fiatjaf.com/nostr"
 	"fiatjaf.com/nostr/eventstore"
 	"fiatjaf.com/nostr/eventstore/boltdb"
 	"fiatjaf.com/nostr/khatru"
+	"fiatjaf.com/nostr/khatru/policies"
 )
 
 const cityDirectoryTransportLimit = 1000
+
+// Directory transports serve short, independent discovery reads from trusted
+// application servers as well as browsers. The generic strict default refills
+// only one connection every five minutes; a healthy server eventually exhausts
+// that lifetime bucket even when every connection is well behaved. Match the
+// existing strict filter budget so connection admission cannot fail first.
+const (
+	cityDirectoryConnectionRefill = 20
+	cityDirectoryConnectionWindow = time.Minute
+	cityDirectoryConnectionBurst  = 100
+)
 
 func loadCityDirectoryTransportEvents(db *boltdb.BoltBackend, cityID string) ([]nostr.Event, error) {
 	events := make([]nostr.Event, 0)
@@ -144,8 +157,9 @@ func configureMultiCityDirectoryTransport(relay *khatru.Relay, db *boltdb.BoltBa
 
 	relay.Info.Name = "BitcoinWalk " + mode + " directory relay"
 	relay.Info.Description = "Public read-only discovery with authenticated, authority-checked BitcoinWalk directory updates."
-	relay.Info.Version = "bitcoinwalk-directory-transport-0.8.84"
+	relay.Info.Version = "bitcoinwalk-directory-transport-0.9.7"
 	relay.MaxAuthenticatedClients = 8
+	relay.RejectConnection = policies.ConnectionRateLimiter(cityDirectoryConnectionRefill, cityDirectoryConnectionWindow, cityDirectoryConnectionBurst)
 	var admission sync.Mutex
 	relay.OnEvent = func(ctx context.Context, event nostr.Event) (bool, string) {
 		admission.Lock()
