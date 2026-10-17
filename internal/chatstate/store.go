@@ -369,9 +369,11 @@ func (s *Store) apply(e nostr.Event, authenticated nostr.PubKey, now time.Time, 
 					state.Picture = t[1]
 				}
 			}
-			state.Private = private
-			state.Restricted = restricted
-			state.Closed = closed
+			if id == organizerGroupID {
+				state.Private = private
+				state.Restricted = restricted
+				state.Closed = closed
+			}
 			action = "metadata"
 		case 9021:
 			if id == organizerGroupID || state.Restricted || state.Closed {

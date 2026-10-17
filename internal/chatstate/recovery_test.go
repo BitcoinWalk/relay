@@ -22,6 +22,17 @@ func TestRecoveryReplaysLegacyPrivateVisibilityWithoutAllowingNewWrites(t *testi
 	}
 }
 
+func TestRecoveryReplaysLegacyPrivateFlagWithoutPersistingNewState(t *testing.T) {
+	s, admin, _ := openTest(t)
+	legacy := event(t, admin, 9002, "city-a", nostr.Tag{"private"})
+	if err := s.apply(legacy, legacy.PubKey, now, true); err != nil {
+		t.Fatal("prepare legacy signed history", err)
+	}
+	if err := s.VerifyRecovery(); err != nil {
+		t.Fatal("legacy private flag changed durable state during replay", err)
+	}
+}
+
 func TestRecoveryRejectsAuthorityTampering(t *testing.T) {
 	s, _, _ := openTest(t)
 	if err := s.VerifyRecovery(); err != nil {
