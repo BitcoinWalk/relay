@@ -30,7 +30,9 @@ approval for activation or replacement, rejects suspended cities, stale
 predecessors, forks and same-key replacement, and keeps exact retries
 idempotent. Revocation remains available after approval or eligibility is lost
 so an already-published identity can always be withdrawn. Private organizer and
-city-signer proof events are not admitted.
+city-signer proof events are not admitted. A creator may remain the public city
+identity when the reviewed owner and city-signer proofs authorize that choice;
+the super-admin identity itself can never be assigned as a city identity.
 
 ## Build and test
 

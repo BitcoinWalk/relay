@@ -55,13 +55,19 @@ func TestCityBrandAdmissionRetainsExactHistory(t *testing.T) {
 	deny(t, relay, cityBrandEvent(t, admin, cityA, 3, revoke.ID.Hex(), "revoke", replacement, 23))
 }
 
+func TestCityBrandAdmissionAllowsCreatorToRemainCityIdentity(t *testing.T) {
+	relay, closeRelay, admin, creator := approvedCityBrandRelay(t)
+	defer closeRelay()
+	accept(t, relay, cityBrandEvent(t, admin, cityA, 0, "", "activate", nostr.GetPublicKey(creator).Hex(), 20))
+}
+
 func TestCityBrandAdmissionRejectsMalformedStaleAndUnauthorizedRecords(t *testing.T) {
 	relay, closeRelay, admin, creator := approvedCityBrandRelay(t)
 	defer closeRelay()
 	brand := nostr.GetPublicKey(nostr.Generate()).Hex()
 	deny(t, relay, cityBrandEvent(t, creator, cityA, 0, "", "activate", brand, 20))
 	deny(t, relay, cityBrandEvent(t, admin, cityB, 0, "", "activate", brand, 20))
-	deny(t, relay, cityBrandEvent(t, admin, cityA, 0, "", "activate", nostr.GetPublicKey(creator).Hex(), 20))
+	deny(t, relay, cityBrandEvent(t, admin, cityA, 0, "", "activate", nostr.GetPublicKey(admin).Hex(), 20))
 	first := cityBrandEvent(t, admin, cityA, 0, "", "activate", brand, 20)
 	accept(t, relay, first)
 	deny(t, relay, cityBrandEvent(t, admin, cityA, 2, first.ID.Hex(), "replace", nostr.GetPublicKey(nostr.Generate()).Hex(), 21))

@@ -129,8 +129,14 @@ func (p *organizerPolicy) checkCityBrand(event nostr.Event) error {
 		if status := p.moderationStatus(binding.CityID, "city:"+binding.CityID); status != "" && status != "active" {
 			return errors.New("restricted: suspended city cannot activate or replace its identity")
 		}
-		if binding.BrandPubkey == p.admin.Hex() || binding.BrandPubkey == grant.CreatorPubkey {
-			return errors.New("restricted: use a separate city identity")
+		// A host may keep the profile that originally created the city when it is
+		// already the intended public BitcoinWalk identity. The application still
+		// requires both owner and city-signer proofs before the super-admin signs
+		// this binding. Only the super-admin identity itself remains forbidden as a
+		// city identity so administrative authority cannot become public city key
+		// custody by accident.
+		if binding.BrandPubkey == p.admin.Hex() {
+			return errors.New("restricted: super-admin cannot be the city identity")
 		}
 	}
 	return nil
