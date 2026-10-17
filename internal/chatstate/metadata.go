@@ -52,10 +52,19 @@ func (s *Store) project(b *bbolt.Bucket, state State, request nostr.Event, now t
 	if name == "" {
 		name = "BitcoinWalk " + state.ID
 	}
-	// City Walkie Talkie discovery is public and joining is self-service. Chat
-	// history remains membership-gated by the transport/store policy; do not
-	// advertise the group itself as NIP-29 private or closed.
 	info := nostr.Tags{{"d", state.ID}, {"name", name}, {"supported_kinds", "9"}}
+	private := state.Private || state.ID == organizerGroupID
+	restricted := state.Restricted || state.ID == organizerGroupID
+	closed := state.Closed || state.ID == organizerGroupID
+	if private {
+		info = append(info, nostr.Tag{"private"})
+	}
+	if restricted {
+		info = append(info, nostr.Tag{"restricted"})
+	}
+	if closed {
+		info = append(info, nostr.Tag{"closed"})
+	}
 	if state.About != "" {
 		info = append(info, nostr.Tag{"about", state.About})
 	}
@@ -188,6 +197,9 @@ func (s *Store) DeliverMetadata(key nostr.PubKey, filter nostr.Filter, deliver f
 			b, state, err := group(tx, string(id))
 			if err != nil {
 				return err
+			}
+			if (state.Private || state.ID == organizerGroupID) && (!state.Members[key.Hex()] || state.Banned[key.Hex()]) {
+				return nil
 			}
 			meta := b.Bucket([]byte("metadata"))
 			if meta == nil {

@@ -21,6 +21,8 @@ import (
 var groups = []byte("chat-groups-v1")
 var validID = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,128}$`)
 
+const organizerGroupID = "bitcoinwalk-organizers"
+
 var ErrDenied = errors.New("restricted: current chat membership required")
 var ErrBanned = errors.New("restricted: banned from this chat")
 
@@ -33,6 +35,9 @@ type State struct {
 	About      string          `json:"about,omitempty"`
 	Banner     string          `json:"banner,omitempty"`
 	Picture    string          `json:"picture,omitempty"`
+	Private    bool            `json:"private,omitempty"`
+	Restricted bool            `json:"restricted,omitempty"`
+	Closed     bool            `json:"closed,omitempty"`
 }
 
 type Record struct {
@@ -175,6 +180,20 @@ func save(b *bbolt.Bucket, state State) error {
 	return b.Put([]byte("state"), data)
 }
 
+func visibility(tags nostr.Tags) (open, private, restricted, closed bool, err error) {
+	seen := map[string]bool{}
+	for _, t := range tags {
+		switch t[0] {
+		case "open", "private", "restricted", "closed":
+			if seen[t[0]] || len(t) != 1 {
+				return false, false, false, false, errors.New("invalid: metadata flag")
+			}
+			seen[t[0]] = true
+		}
+	}
+	return seen["open"], seen["private"], seen["restricted"], seen["closed"], nil
+}
+
 // Apply requires the transport-verified NIP-42 identity, never a caller-supplied
 // claim from an HTTP body. Replay detection, authorization, event persistence
 // and membership/ban changes occur in one transaction.
@@ -209,6 +228,17 @@ func (s *Store) apply(e nostr.Event, authenticated nostr.PubKey, now time.Time, 
 	if !validID.MatchString(id) {
 		return errors.New("invalid: chat ID")
 	}
+	open, private, restricted, closed, err := visibility(e.Tags)
+	if err != nil {
+		return err
+	}
+	if e.Kind == 9002 && id == organizerGroupID {
+		if open || !private || !restricted || !closed {
+			return errors.New("restricted: organizer chat requires private restricted closed metadata")
+		}
+	} else if e.Kind == 9002 && (private || restricted || closed) && !allowLegacyVisibility {
+		return errors.New("restricted: public open-join metadata required")
+	}
 	// Do not silently ignore unsupported authority, expiry or reference tags.
 	for _, t := range e.Tags {
 		if len(t) == 0 {
@@ -242,13 +272,17 @@ func (s *Store) apply(e nostr.Event, authenticated nostr.PubKey, now time.Time, 
 					return fmt.Errorf("invalid: %s must be empty or an HTTPS URL", t[0])
 				}
 			}
-		case "open":
+		case "open", "closed":
 			if e.Kind != 9002 || len(t) != 1 {
 				return errors.New("invalid: metadata flag")
 			}
 		case "private", "restricted":
-			if !allowLegacyVisibility || e.Kind != 9002 || len(t) != 1 {
+			if e.Kind != 9002 || len(t) != 1 || (id != organizerGroupID && !allowLegacyVisibility) {
 				return errors.New("restricted: public open-join metadata required")
+			}
+		case "supported_kinds":
+			if e.Kind != 9002 || len(t) != 2 || t[1] != "9" {
+				return errors.New("invalid: supported chat kinds")
 			}
 		case "visibility":
 			if !allowLegacyVisibility || e.Kind != 9002 || len(t) != 2 || t[1] != "private" {
@@ -335,8 +369,14 @@ func (s *Store) apply(e nostr.Event, authenticated nostr.PubKey, now time.Time, 
 					state.Picture = t[1]
 				}
 			}
+			state.Private = private
+			state.Restricted = restricted
+			state.Closed = closed
 			action = "metadata"
 		case 9021:
+			if id == organizerGroupID || state.Restricted || state.Closed {
+				return errors.New("restricted: invitation required")
+			}
 			if state.Banned[author] {
 				return ErrBanned
 			}

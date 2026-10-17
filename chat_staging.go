@@ -51,8 +51,8 @@ func runChat() error {
 	r.ServiceURL = public.String()
 	if mode == "production" {
 		r.Info.Name = "BitcoinWalk Community"
-		r.Info.Description = "The members-only global community relay for free-tier BitcoinWalk cities."
-		r.Info.Version = "bitcoinwalk-chat-shared-0.9.2"
+		r.Info.Description = "BitcoinWalk public city channels and access-controlled organizer communities."
+		r.Info.Version = "bitcoinwalk-chat-shared-0.9.4"
 	} else if mode == "city" {
 		name := os.Getenv("RELAY_CHAT_NAME")
 		if name == "" {
