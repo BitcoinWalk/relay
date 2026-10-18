@@ -93,6 +93,8 @@ type organizerPolicy struct {
 	mu             sync.Mutex
 	limits         *chatLimits
 	replicaJournal *replicaJournal
+	// Set only for an isolated, signed replica-bundle validation snapshot.
+	retainedReplicaValidation bool
 }
 
 func uniqueTag(event nostr.Event, name string) (string, error) {
@@ -481,7 +483,7 @@ func (p *organizerPolicy) check(ctx context.Context, event nostr.Event) error {
 					if proposal == nil || proposal.Kind != 31923 || proposal.PubKey != revision.PubKey {
 						return errors.New("invalid: submitted initial walk unavailable")
 					}
-					previouslyReleased := p.previouslyReleasedInitial(decision.CityID, decision.RevisionID, revisionInitial)
+					previouslyReleased := p.retainedReplicaValidation || p.previouslyReleasedInitial(decision.CityID, decision.RevisionID, revisionInitial)
 					if err := p.validateInitialProposal(*proposal, &city, !previouslyReleased); err != nil {
 						return err
 					}

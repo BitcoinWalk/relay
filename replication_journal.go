@@ -472,12 +472,9 @@ func (j *replicaJournal) recordEventLocked(policy *organizerPolicy, event nostr.
 				// store. Once the exact initial walk has already been retained in
 				// the durable journal, restart reconciliation must use that record
 				// instead of requiring the superseded source row to remain present.
-				if retained, found, err := j.entry(initialID); err != nil {
+				if retained, err := j.initialDependency(initialID, decision.CityID); err != nil {
 					return nil, false, err
-				} else if found {
-					if retained.Action != "occurrence" || retained.CityID != decision.CityID || retained.EventID != initialID || retained.Event.ID.Hex() != initialID || retained.Event.Kind != 31923 {
-						return nil, false, errors.New("approved initial walk journal record is invalid")
-					}
+				} else if retained != nil {
 					continue
 				}
 				return nil, false, errors.New("approved initial walk is unavailable for replication")
@@ -518,6 +515,11 @@ func (p *organizerPolicy) recoverReplicaJournal(journal *replicaJournal) (int, e
 	if journal == nil {
 		return 0, errors.New("replica journal unavailable")
 	}
+	// Dependency-only originals must be available while rebuilding envelopes,
+	// before the caller attaches the reconciled journal for live writes.
+	previousJournal := p.replicaJournal
+	p.replicaJournal = journal
+	defer func() { p.replicaJournal = previousJournal }()
 	if err := journal.beginReconciliation(); err != nil {
 		journal.setUnhealthy(err)
 		return 0, err

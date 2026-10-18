@@ -19,10 +19,11 @@ import (
 // Policy records are internal replication data, never a public calendar feed.
 // In particular creator provenance must not be exposed as a newly public proposal.
 type replicaBundle struct {
-	Version      int           `json:"version"`
-	CityID       string        `json:"cityId"`
-	Events       []nostr.Event `json:"events"`
-	OccurrenceID string        `json:"occurrenceId"`
+	Version           int           `json:"version"`
+	CityID            string        `json:"cityId"`
+	Events            []nostr.Event `json:"events"`
+	OccurrenceID      string        `json:"occurrenceId"`
+	DependencyOnlyIDs []string      `json:"dependencyOnlyIds,omitempty"`
 }
 
 // A new-city approval may release eight initial walks. A later occurrence then
@@ -55,6 +56,7 @@ func validateReplicaBundle(ctx context.Context, data []byte, scope replicaScope,
 		return errors.New("invalid: bundle envelope")
 	}
 	seen := map[string]bool{}
+	releasedInitials := map[string]bool{}
 	for _, event := range bundle.Events {
 		if seen[event.ID.Hex()] || !event.CheckID() || !event.VerifySignature() {
 			return errors.New("invalid: duplicate or corrupt bundle event")
@@ -76,6 +78,9 @@ func validateReplicaBundle(ctx context.Context, data []byte, scope replicaScope,
 			if event.PubKey != admin || json.Unmarshal([]byte(event.Content), &decision) != nil || decision.CityID != scope.CityID || decision.Status != "approved" {
 				return errors.New("invalid: bundle approval")
 			}
+			for _, id := range decisionInitialIDs(decision) {
+				releasedInitials[id] = true
+			}
 		case 31923:
 			city, err := uniqueTag(event, "i")
 			if err != nil || city != scope.CityID {
@@ -83,6 +88,24 @@ func validateReplicaBundle(ctx context.Context, data []byte, scope replicaScope,
 			}
 		default:
 			return errors.New("restricted: unsupported bundle kind")
+		}
+	}
+	if len(bundle.DependencyOnlyIDs) > 8 {
+		return errors.New("invalid: dependency archive bound")
+	}
+	dependencySeen := map[string]bool{}
+	for _, id := range bundle.DependencyOnlyIDs {
+		if dependencySeen[id] || !seen[id] || !releasedInitials[id] || id == bundle.OccurrenceID {
+			return errors.New("invalid: dependency-only identifier")
+		}
+		dependencySeen[id] = true
+		for _, event := range bundle.Events {
+			if event.ID.Hex() == id {
+				marker, ok := exactCalendarTag(event, "bitcoinwalk")
+				if event.Kind != 31923 || !ok || marker != "initial-proposal-v1" {
+					return errors.New("invalid: archived dependency kind")
+				}
+			}
 		}
 	}
 	dir, err := os.MkdirTemp("", "bitcoinwalk-replica-validation-")
@@ -95,7 +118,7 @@ func validateReplicaBundle(ctx context.Context, data []byte, scope replicaScope,
 		return err
 	}
 	defer db.Close()
-	policy := &organizerPolicy{db: db, admin: admin}
+	policy := &organizerPolicy{db: db, admin: admin, retainedReplicaValidation: true}
 	// Revisions are schema/signature-checked provenance, not new proposals. Their
 	// authorization is established by the admin-signed grant and approval below.
 	for _, event := range bundle.Events {
@@ -226,10 +249,40 @@ func (p *organizerPolicy) exportReplicaBundleLocked(cityID, occurrenceID string)
 	// Include only an initial walk explicitly released by this exact approval.
 	for _, initialID := range decisionInitialIDs(decision) {
 		initial := p.byID(initialID)
+		archived := initial == nil
+		if initial == nil && p.replicaJournal != nil {
+			var err error
+			initial, err = p.replicaJournal.initialDependency(initialID, cityID)
+			if err != nil {
+				return nil, err
+			}
+		}
 		if initial == nil {
 			return nil, errors.New("invalid: released initial walk missing")
 		}
-		if err := p.checkCalendarRead(*initial); err != nil {
+		if archived {
+			bundle.DependencyOnlyIDs = append(bundle.DependencyOnlyIDs, initialID)
+			// Superseded originals are provenance for this exact signed approval,
+			// not public occurrences. Validate all approved content while allowing
+			// the source's newer addressable walk to remain authoritative.
+			revision := p.byID(decision.RevisionID)
+			if revision == nil || revision.PubKey != initial.PubKey {
+				return nil, errors.New("invalid: archived initial creator mismatch")
+			}
+			city, err := parseDraft(*revision)
+			if err != nil {
+				return nil, err
+			}
+			if err := p.checkEventVisibility(*initial); err != nil {
+				return nil, err
+			}
+			if p.calendarDeleted(initial.ID.Hex(), initial.PubKey) {
+				return nil, errors.New("restricted: archived initial was canceled")
+			}
+			if err := p.validateInitialProposalWithAddress(*initial, &city, false, false); err != nil {
+				return nil, err
+			}
+		} else if err := p.checkCalendarRead(*initial); err != nil {
 			return nil, err
 		}
 		if err := add(initial); err != nil {
