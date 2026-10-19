@@ -101,6 +101,13 @@ func TestChatWebSocketMembershipAndRevocation(t *testing.T) {
 	}
 	pub(owner, event(admin, 9007, "a", "create"))
 	pub(owner, event(admin, 9007, "b", "create"))
+	pub(owner, event(admin, 9007, "bitcoinwalk-organizers", "create"))
+	pub(owner, event(admin, 9002, "bitcoinwalk-organizers", "private hosts",
+		nostr.Tag{"name", "BitcoinWalk Organizers"},
+		nostr.Tag{"supported_kinds", "9"},
+		nostr.Tag{"private"}, nostr.Tag{"restricted"}, nostr.Tag{"closed"},
+	))
+	pub(owner, event(admin, 9, "bitcoinwalk-organizers", "hosts only"))
 	// Armada asks for 500: discovery must work without exposing the private roster.
 	discovery, err := anon.Subscribe(ctx, nostr.Filter{Kinds: []nostr.Kind{39000, 39002}, Limit: 500, Tags: nostr.TagMap{"d": []string{"a"}}}, nostr.SubscriptionOptions{})
 	if err != nil {
@@ -140,11 +147,43 @@ func TestChatWebSocketMembershipAndRevocation(t *testing.T) {
 			t.Fatal("request was not rejected")
 		}
 	}
-	rejected(anon, f)
-	rejected(other, f)
+	readEmpty := func(c *nostr.Relay, filter nostr.Filter) {
+		t.Helper()
+		sub, err := c.Subscribe(ctx, filter, nostr.SubscriptionOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer sub.Unsub()
+		select {
+		case e := <-sub.Events:
+			t.Fatalf("unexpected public event: %v", e)
+		case reason := <-sub.ClosedReason:
+			t.Fatalf("public read was rejected: %s", reason)
+		case <-sub.EndOfStoredEvents:
+		case <-ctx.Done():
+			t.Fatal("public read stalled")
+		}
+	}
+	readEmpty(anon, f)
+	readEmpty(other, f)
+	hostsFilter := nostr.Filter{Kinds: []nostr.Kind{9}, Tags: nostr.TagMap{"h": []string{"bitcoinwalk-organizers"}}}
+	rejected(other, hostsFilter)
+	hosts, err := owner.Subscribe(ctx, hostsFilter, nostr.SubscriptionOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case got := <-hosts.Events:
+		if got.Content != "hosts only" {
+			t.Fatal("wrong private host history")
+		}
+	case <-ctx.Done():
+		t.Fatal("host could not read private history")
+	}
+	hosts.Unsub()
 	rejected(member, nostr.Filter{})
 	rejected(member, nostr.Filter{IDs: []nostr.ID{}})
-	rejected(member, nostr.Filter{Kinds: []nostr.Kind{9}, Tags: nostr.TagMap{"h": []string{"a", "b"}}})
+	readEmpty(member, nostr.Filter{Kinds: []nostr.Kind{9}, Tags: nostr.TagMap{"h": []string{"a", "b"}}})
 	if err := member.Publish(ctx, event(user, 9, "a", "not yet joined")); err == nil {
 		t.Fatal("nonmember wrote")
 	}
@@ -165,8 +204,8 @@ func TestChatWebSocketMembershipAndRevocation(t *testing.T) {
 	first := event(user, 9, "a", "first", nostr.Tag{"client", "Armada"})
 	pub(member, first)
 	pub(owner, event(admin, 9, "b", "private b history"))
-	// Armada combines every discovered group, including groups not joined.
-	f.Tags["h"] = []string{"b", "a"}
+	// A public room is readable whether or not this identity joined it.
+	f.Tags["h"] = []string{"a"}
 	ownerHistory, err := owner.Subscribe(ctx, nostr.Filter{Kinds: []nostr.Kind{9, 1068}, Tags: nostr.TagMap{"h": []string{"a"}}, Limit: 30}, nostr.SubscriptionOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -226,7 +265,19 @@ func TestChatWebSocketMembershipAndRevocation(t *testing.T) {
 	case <-ctx.Done():
 		t.Fatal("missing live event")
 	}
-	rejected(member, nostr.Filter{Kinds: []nostr.Kind{9}, Tags: nostr.TagMap{"h": []string{"b"}}})
+	publicB, err := member.Subscribe(ctx, nostr.Filter{Kinds: []nostr.Kind{9}, Tags: nostr.TagMap{"h": []string{"b"}}}, nostr.SubscriptionOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case got := <-publicB.Events:
+		if got.Content != "private b history" && got.Content != "private b live" {
+			t.Fatal("wrong public nonmember history")
+		}
+	case <-ctx.Done():
+		t.Fatal("public nonmember history missing")
+	}
+	publicB.Unsub()
 	pub(owner, event(admin, 9001, "a", "ban", nostr.Tag{"p", nostr.GetPublicKey(user).Hex()}, nostr.Tag{"bitcoinwalk-ban", "true"}))
 	pub(owner, event(admin, 9, "a", "after ban"))
 	select {
