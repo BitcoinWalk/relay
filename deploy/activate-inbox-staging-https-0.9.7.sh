@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+test "$EUID" -eq 0 || { echo 'Run this activation with sudo.' >&2; exit 1; }
+test "$#" -eq 0 || { echo "Usage: $0" >&2; exit 1; }
+root_dir=$(cd "$(dirname "$0")/.." && pwd)
+cd "$root_dir"
+
+manifest=INBOX-STAGING-0.9.7-SHA256SUMS
+snippet="$root_dir/deploy/inbox-staging-0.9.7.caddy"
+caddyfile=/etc/caddy/Caddyfile
+host=inbox-staging.bitcoinwalk.org
+
+sha256sum -c "$manifest"
+for command in caddy cp curl getent install mktemp sha256sum systemctl; do command -v "$command" >/dev/null; done
+test -f "$snippet"; test -f "$caddyfile"; test ! -L "$snippet"; test ! -L "$caddyfile"
+systemctl is-active --quiet bitcoinwalk-inbox-staging.service
+curl -fsS --max-time 3 http://127.0.0.1:3348/healthz >/dev/null
+getent ahostsv4 "$host" >/dev/null || { echo "$host does not resolve yet; add DNS before public activation." >&2; exit 1; }
+! grep -Fq "$host {" "$caddyfile" || { echo "$host is already present in Caddy; stop for review." >&2; exit 1; }
+
+backup=$(mktemp -d /var/backups/bitcoinwalk-inbox-staging-https.XXXXXX)
+chmod 0700 "$backup"
+cp -p "$caddyfile" "$backup/Caddyfile.before"
+candidate="$backup/Caddyfile.candidate"
+cp -p "$caddyfile" "$candidate"
+printf '\n' >>"$candidate"
+cat "$snippet" >>"$candidate"
+caddy validate --config "$candidate" --adapter caddyfile
+
+changed=0
+cleanup() {
+	status=$?
+	trap - EXIT HUP INT TERM
+	if test "$status" -ne 0 && test "$changed" -eq 1; then
+		install -o root -g root -m 0644 "$backup/Caddyfile.before" "$caddyfile"
+		systemctl reload caddy || true
+		echo "Inbox HTTPS activation failed; the prior Caddy configuration was restored. Evidence: $backup" >&2
+	fi
+	exit "$status"
+}
+trap cleanup EXIT HUP INT TERM
+
+install -o root -g root -m 0644 "$candidate" "$caddyfile"
+changed=1
+systemctl reload caddy
+for _ in $(seq 1 60); do
+	if curl -fsS --max-time 5 "https://$host/healthz" >"$backup/public-health.json"; then break; fi
+	sleep 1
+done
+curl -fsS --max-time 10 "https://$host/healthz" >"$backup/public-health.json"
+curl -fsS --max-time 10 -H 'Accept: application/nostr+json' "https://$host/" >"$backup/public-nip11.json"
+python3 - "$backup/public-nip11.json" <<'PY'
+import json,sys
+data=json.load(open(sys.argv[1],encoding="utf-8"))
+assert data.get("version")=="bitcoinwalk-inbox-0.9.7", data
+assert {17,42,59}.issubset(set(data.get("supported_nips",[]))), data
+PY
+sha256sum "$backup/Caddyfile.before" "$candidate" "$backup/public-health.json" "$backup/public-nip11.json" >"$backup/SHA256SUMS"
+
+trap - EXIT HUP INT TERM
+echo "BitcoinWalk inbox staging is public at wss://$host/. Evidence: $backup"
+echo 'Existing event and NIP-29 relays, applications and production state were not changed.'

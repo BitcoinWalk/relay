@@ -1,0 +1,27 @@
+# Append this complete site block only after inbox-staging.bitcoinwalk.org resolves
+# to this server. The relay itself remains bound to loopback port 3348.
+inbox-staging.bitcoinwalk.org {
+	@relay {
+		header Upgrade websocket
+	}
+	handle @relay {
+		reverse_proxy 127.0.0.1:3348 {
+			header_up X-Forwarded-For {http.request.remote.host}
+			header_up X-Forwarded-Host inbox-staging.bitcoinwalk.org
+			header_up X-Forwarded-Proto https
+			header_up -Forwarded
+		}
+	}
+	@info {
+		header Accept *application/nostr+json*
+	}
+	handle @info {
+		reverse_proxy 127.0.0.1:3348
+	}
+	handle /healthz {
+		reverse_proxy 127.0.0.1:3348
+	}
+	handle {
+		reverse_proxy 127.0.0.1:3348
+	}
+}

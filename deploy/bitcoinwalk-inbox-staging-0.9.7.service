@@ -1,0 +1,39 @@
+[Unit]
+Description=BitcoinWalk authenticated NIP-17 inbox relay (staging)
+After=network.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+DynamicUser=yes
+StateDirectory=bitcoinwalk-inbox-staging
+StateDirectoryMode=0700
+WorkingDirectory=/var/lib/bitcoinwalk-inbox-staging
+ExecStart=/opt/bitcoinwalk-inbox-staging/bitcoinwalk-relay
+Environment=RELAY_INBOX_MODE=true
+Environment="RELAY_INBOX_NAME=BitcoinWalk private message inbox (staging)"
+Environment=RELAY_INBOX_LISTEN=127.0.0.1:3348
+Environment=RELAY_INBOX_DB=/var/lib/bitcoinwalk-inbox-staging/inbox.db
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+MemoryMax=512M
+TasksMax=128
+
+[Install]
+WantedBy=multi-user.target

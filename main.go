@@ -124,6 +124,13 @@ func newRelay(dbPath string, writers map[nostr.PubKey]bool) (*khatru.Relay, *bol
 }
 
 func run() error {
+	inboxMode := env("RELAY_INBOX_MODE", "false")
+	if inboxMode != "false" && inboxMode != "true" {
+		return errors.New("RELAY_INBOX_MODE must be true or false")
+	}
+	if inboxMode == "true" {
+		return runInbox()
+	}
 	if cityRelayGatewayConfigured() {
 		return runCityRelayGateway()
 	}

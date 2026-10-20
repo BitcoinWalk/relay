@@ -1,0 +1,23 @@
+BitcoinWalk private inbox staging 0.9.7
+=======================================
+
+This release adds a new isolated NIP-17/NIP-59 inbox relay. It does not replace
+or modify relay.bitcoinwalk.org, relay-staging.bitcoinwalk.org or
+chat.bitcoinwalk.org.
+
+Install the loopback-only staging service first:
+
+  cd /home/bitcoinwalk/incoming/bitcoinwalk-inbox-staging-0.9.7
+  sudo ./deploy/install-inbox-staging-0.9.7.sh
+
+The installer leaves DNS and Caddy unchanged. After the DNS record for
+inbox-staging.bitcoinwalk.org points at the relay server, publish the HTTPS/WSS
+endpoint with:
+
+  sudo ./deploy/activate-inbox-staging-https-0.9.7.sh
+
+Do not prepare or activate the production endpoint until the staging privacy,
+authentication, restart and retention checks have passed.
+
+The push notification API is separate work. This release provides private
+message transport only.
