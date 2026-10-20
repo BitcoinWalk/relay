@@ -1,0 +1,7 @@
+283e5f0c014d3118fe41238985d328c0285d4b314adb754ec2db1714c984f344  bitcoinwalk-inbox-production-0.9.7
+e5e9a6c1d4dff56806f2ad82b6a6ee4159ae1e6214bee819838fc5a1ed74ec0b  bitcoinwalk-inbox-audit-0.9.7
+72335106f4a94f82b36abef0b01baefdbb69e08c362cfde14edceeb8b4291f4e  INBOX-PRODUCTION-0.9.7-README.txt
+9c897a3bcfc99cb87baefb9586405e686bd47666037bd1d686d1b79476d7c949  deploy/bitcoinwalk-inbox-production-0.9.7.service
+98608f0de4e745cec3d01fcf386a9f0955d66d713524dc1a6194797d191281a6  deploy/inbox-production-0.9.7.caddy
+6aa5d9841740a9751f7fc6b2e69bbc37b6c4afaaa4359b50ec1aed6f539c12b9  deploy/install-inbox-production-0.9.7.sh
+b74a4908dc1d2908a15c4754fa13df40de35b9e80b2e202a2b55d67be4191708  deploy/activate-inbox-production-https-0.9.7.sh

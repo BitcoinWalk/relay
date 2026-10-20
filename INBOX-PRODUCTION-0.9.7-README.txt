@@ -1,0 +1,22 @@
+BitcoinWalk private inbox production 0.9.7
+================================================
+
+This release promotes the staging-accepted NIP-17/NIP-59 inbox relay to a
+separate production service and database.
+
+Install the loopback-only production service first:
+
+  cd /home/bitcoinwalk/incoming/bitcoinwalk-inbox-production-0.9.7
+  sudo ./deploy/install-inbox-production-0.9.7.sh
+
+The installer leaves DNS and Caddy unchanged. Add an explicit A record for
+inbox.bitcoinwalk.org pointing to 213.232.235.138; the bitcoinwalk.org wildcard
+points at a different host and is not sufficient. Then activate HTTPS/WSS:
+
+  sudo ./deploy/activate-inbox-production-https-0.9.7.sh
+
+Both steps recheck staging. Public activation also runs a recipient-isolation
+audit against production before reporting success.
+
+This release does not change the mobile app. The app may be migrated from the
+PsstPsst inbox only after the production endpoint passes acceptance.
