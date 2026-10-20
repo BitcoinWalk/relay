@@ -1,6 +1,6 @@
 283e5f0c014d3118fe41238985d328c0285d4b314adb754ec2db1714c984f344  bitcoinwalk-inbox-staging-0.9.7
-dd21af74a264574155d48bcf0dc87c6c9788c58feb1014a28e91131c3db071d1  INBOX-STAGING-0.9.7-README.txt
+72b2635bd7b51b13708de78115aec063cc38aa7c57cd5e37ecb1a5f59a26e9ad  INBOX-STAGING-0.9.7-README.txt
 f979892ea4b0e2824b06ec51ee6401c0d75c9d2891cfd6774a987765d39b5e09  deploy/bitcoinwalk-inbox-staging-0.9.7.service
 7e83cb4a33e3f5a51878fc4a4c493b343812e2cb0532fd33b25789ef9bacc834  deploy/inbox-staging-0.9.7.caddy
 1c49a7a03a0e3e44cebc398744e1e3000e0911348bebed2b380642874b4aa2b9  deploy/install-inbox-staging-0.9.7.sh
-834204c87a6df5ef5f55a74254dc03d7d2334f8a5c2d1faa522f21533eebc4b7  deploy/activate-inbox-staging-https-0.9.7.sh
+eb2e998b0bcd1aaccc5c50210cbb8acdedb585c0a854ed3799d3a69a830c8454  deploy/activate-inbox-staging-https-0.9.7.sh

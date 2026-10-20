@@ -10,13 +10,17 @@ manifest=INBOX-STAGING-0.9.7-SHA256SUMS
 snippet="$root_dir/deploy/inbox-staging-0.9.7.caddy"
 caddyfile=/etc/caddy/Caddyfile
 host=inbox-staging.bitcoinwalk.org
+expected_ipv4=213.232.235.138
 
 sha256sum -c "$manifest"
 for command in caddy cp curl getent install mktemp sha256sum systemctl; do command -v "$command" >/dev/null; done
 test -f "$snippet"; test -f "$caddyfile"; test ! -L "$snippet"; test ! -L "$caddyfile"
 systemctl is-active --quiet bitcoinwalk-inbox-staging.service
 curl -fsS --max-time 3 http://127.0.0.1:3348/healthz >/dev/null
-getent ahostsv4 "$host" >/dev/null || { echo "$host does not resolve yet; add DNS before public activation." >&2; exit 1; }
+getent ahostsv4 "$host" | awk -v expected="$expected_ipv4" '$1==expected { found=1 } END { exit !found }' || {
+	echo "$host must have an explicit A record for $expected_ipv4 before public activation; the bitcoinwalk.org wildcard is not sufficient." >&2
+	exit 1
+}
 ! grep -Fq "$host {" "$caddyfile" || { echo "$host is already present in Caddy; stop for review." >&2; exit 1; }
 
 backup=$(mktemp -d /var/backups/bitcoinwalk-inbox-staging-https.XXXXXX)

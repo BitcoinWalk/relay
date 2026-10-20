@@ -10,9 +10,10 @@ Install the loopback-only staging service first:
   cd /home/bitcoinwalk/incoming/bitcoinwalk-inbox-staging-0.9.7
   sudo ./deploy/install-inbox-staging-0.9.7.sh
 
-The installer leaves DNS and Caddy unchanged. After the DNS record for
-inbox-staging.bitcoinwalk.org points at the relay server, publish the HTTPS/WSS
-endpoint with:
+The installer leaves DNS and Caddy unchanged. Add an explicit A record for
+inbox-staging.bitcoinwalk.org pointing to 213.232.235.138; the bitcoinwalk.org
+wildcard currently points at a different host and is not sufficient. Then
+publish the HTTPS/WSS endpoint with:
 
   sudo ./deploy/activate-inbox-staging-https-0.9.7.sh
 

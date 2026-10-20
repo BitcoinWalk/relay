@@ -22,7 +22,9 @@ discoverable through public event or group-chat queries.
 
 1. Build and install the isolated staging service on loopback port `3348` with
    `deploy/install-inbox-staging-0.9.7.sh`.
-2. Point `inbox-staging.bitcoinwalk.org` at the relay server.
+2. Add an explicit A record for `inbox-staging.bitcoinwalk.org` pointing at the
+   relay server (`213.232.235.138`). Do not rely on the `bitcoinwalk.org`
+   wildcard, which currently points at a different host.
 3. Publish the staging endpoint with
    `deploy/activate-inbox-staging-https-0.9.7.sh`.
 4. Exercise NIP-42 publish, recipient read, foreign-reader rejection, restart,
