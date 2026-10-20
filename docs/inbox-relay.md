@@ -35,3 +35,13 @@ discoverable through public event or group-chat queries.
 Push notifications are a separate HTTP service. This relay replaces the
 message-transport dependency on `relay.psstpsst.chat`; it does not by itself
 replace the existing push API.
+
+The public privacy acceptance can be repeated without persistent test keys:
+
+```sh
+go run ./cmd/inbox-audit -relay wss://inbox-staging.bitcoinwalk.org/
+```
+
+The audit publishes a short-lived gift wrap, proves unauthenticated publishing
+is rejected, proves a different authenticated identity cannot read it, and
+proves the tagged recipient can read the exact event.
