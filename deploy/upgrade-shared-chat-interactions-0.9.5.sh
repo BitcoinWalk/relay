@@ -22,7 +22,9 @@ test "$(sha256sum "$target" | cut -d ' ' -f 1)" = db5efeee38bb9199b0ed906ea82bc0
 }
 test "$(sha256sum "$target" | cut -d ' ' -f 1)" = e3514cf214e4261a19aa48533ba19390b67a186468dbd9c423fc4cd4b7aa24a8 || { echo "Unexpected installed chat binary; stop for review." >&2; exit 1; }
 test "$(sha256sum "$unit" | cut -d ' ' -f 1)" = 98d21d1fdccf9dbcbc955ab6f1909b240ab2bc41ca340d38f3ab0c7f970a82ef || { echo "Unexpected chat service contract; stop for review." >&2; exit 1; }
-test "$(cat "$config")" = 'RELAY_CHAT_URL=wss://chat.bitcoinwalk.org' || { echo "Unexpected public chat configuration; stop for review." >&2; exit 1; }
+test "$(sha256sum "$config" | cut -d ' ' -f 1)" = dd7a61a18b9cc6052b359e858116fabf6e34707ba92b45d39ccd5a30a9fcea86 || { echo "Unexpected public chat configuration; stop for review." >&2; exit 1; }
+test "$(grep -c '^RELAY_CHAT_URL=' "$config")" -eq 1 || { echo "Public chat URL setting is missing or duplicated; stop for review." >&2; exit 1; }
+grep -Fx 'RELAY_CHAT_URL=wss://chat.bitcoinwalk.org' "$config" >/dev/null || { echo "Unexpected public chat URL; stop for review." >&2; exit 1; }
 systemctl is-active --quiet "$service"
 curl -fsS --max-time 5 http://127.0.0.1:3339/healthz >/dev/null
 

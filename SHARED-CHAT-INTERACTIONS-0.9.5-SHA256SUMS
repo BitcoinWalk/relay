@@ -1,4 +1,4 @@
 db5efeee38bb9199b0ed906ea82bc096c2c57dc1941df0342f1d43d10d4c4797  bitcoinwalk-chat-shared-0.9.5
 3f838ab9ff7d87759932514eaedf327130fd04dc122e795d591bd27b21d54c5c  chat-public-audit-0.9.5
 37b7be119966389e5c81217e0a29e7d5ee25eba4d373c021dbe970a0a108798c  SHARED-CHAT-INTERACTIONS-0.9.5-README.txt
-40079490a0d0ae335c4dcbff12222ce4c8d1ce887c89723968b4d13dd51b7885  deploy/upgrade-shared-chat-interactions-0.9.5.sh
+2bb94329d2d2556b91589addad355d5fcc59ee33469dafbd4bc0f5b77201b4c2  deploy/upgrade-shared-chat-interactions-0.9.5.sh
