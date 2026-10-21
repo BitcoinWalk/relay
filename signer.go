@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"iter"
 	"log"
 	"net/http"
 	"strings"
@@ -14,19 +15,92 @@ import (
 	"fiatjaf.com/nostr/khatru"
 )
 
+const (
+	signerReplayTTL = 2 * time.Minute
+	signerReplayMax = 256
+)
+
+type signerReplayEntry struct {
+	event nostr.Event
+	at    time.Time
+}
+
+// signerReplayBuffer keeps a small, process-local recovery window for Android
+// app-to-signer handoffs. Kind 24133 remains encrypted end to end and is never
+// written to disk. The strict relay request policy still requires one exact
+// recipient, so callers cannot enumerate the buffer.
+type signerReplayBuffer struct {
+	mu      sync.Mutex
+	entries []signerReplayEntry
+	ttl     time.Duration
+	max     int
+	now     func() time.Time
+}
+
+func newSignerReplayBuffer(ttl time.Duration, max int, now func() time.Time) *signerReplayBuffer {
+	return &signerReplayBuffer{ttl: ttl, max: max, now: now}
+}
+
+func (b *signerReplayBuffer) add(event nostr.Event) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	now := b.now()
+	b.pruneLocked(now)
+	b.entries = append(b.entries, signerReplayEntry{event: event, at: now})
+	if overflow := len(b.entries) - b.max; overflow > 0 {
+		b.entries = append([]signerReplayEntry(nil), b.entries[overflow:]...)
+	}
+}
+
+func (b *signerReplayBuffer) query(filter nostr.Filter) iter.Seq[nostr.Event] {
+	b.mu.Lock()
+	b.pruneLocked(b.now())
+	snapshot := append([]signerReplayEntry(nil), b.entries...)
+	b.mu.Unlock()
+
+	limit := filter.Limit
+	if limit <= 0 || limit > 8 {
+		limit = 8
+	}
+	return func(yield func(nostr.Event) bool) {
+		delivered := 0
+		for i := len(snapshot) - 1; i >= 0 && delivered < limit; i-- {
+			if !filter.Matches(snapshot[i].event) {
+				continue
+			}
+			delivered++
+			if !yield(snapshot[i].event) {
+				return
+			}
+		}
+	}
+}
+
+func (b *signerReplayBuffer) pruneLocked(now time.Time) {
+	cutoff := now.Add(-b.ttl)
+	first := 0
+	for first < len(b.entries) && b.entries[first].at.Before(cutoff) {
+		first++
+	}
+	if first > 0 {
+		b.entries = append([]signerReplayEntry(nil), b.entries[first:]...)
+	}
+}
+
 // A separate ephemeral transport: no identity key, database or chat access.
 // Recipient filters are routing, NOT authorization. Anyone knowing a recipient
 // pubkey can observe its encrypted envelopes. Only the endpoints decrypt them.
 func newSignerRelay() *khatru.Relay {
 	r := khatru.NewRelay()
 	r.Info.Name = env("RELAY_SIGNER_NAME", "BitcoinWalk remote signing transport")
-	r.Info.Description = "Ephemeral NIP-46 transport. Encrypted signing messages are relayed live and never stored."
+	r.Info.Description = "NIP-46 transport with a short memory-only recovery window. Encrypted signing messages are never written to disk."
 	r.Info.SupportedNIPs = []any{1, 11, 46}
-	r.Info.Version = "bitcoinwalk-remote-signer-0.8.62"
+	r.Info.Version = "bitcoinwalk-remote-signer-0.8.63"
 	r.MaxMessageSize = 65536
 	r.WriteWait = 2 * time.Second
 	r.Negentropy = false
 	limits := &chatLimits{}
+	replay := newSignerReplayBuffer(signerReplayTTL, signerReplayMax, time.Now)
 	var mu sync.Mutex
 	counts := map[*khatru.WebSocket]int{}
 	type lease struct {
@@ -101,6 +175,12 @@ func newSignerRelay() *khatru.Relay {
 			log.Print("NIP-46 event accepted")
 		}
 		return reject, reason
+	}
+	r.OnEphemeralEvent = func(_ context.Context, e nostr.Event) {
+		replay.add(e)
+	}
+	r.QueryStored = func(_ context.Context, filter nostr.Filter) iter.Seq[nostr.Event] {
+		return replay.query(filter)
 	}
 	requestPolicy := func(ctx context.Context, f nostr.Filter) (bool, string) {
 		if len(f.Kinds) != 1 || f.Kinds[0] != 24133 || len(f.Tags) != 1 || len(f.Tags["p"]) != 1 {
@@ -195,18 +275,21 @@ func runSignerAcceptance(target string) error {
 	case <-ctx.Done():
 		return errors.New("signer acceptance live delivery timed out")
 	}
-	late, err := receiver.Subscribe(ctx, filter, nostr.SubscriptionOptions{})
+	recoveryFilter := filter
+	recoveryFilter.Limit = 1
+	late, err := receiver.Subscribe(ctx, recoveryFilter, nostr.SubscriptionOptions{})
 	if err != nil {
 		return fmt.Errorf("late subscribe: %w", err)
 	}
 	defer late.Unsub()
 	select {
-	case <-late.Events:
-		return errors.New("signer acceptance found persisted history")
-	case <-late.EndOfStoredEvents:
+	case got := <-late.Events:
+		if got.ID != event.ID {
+			return errors.New("signer acceptance recovered the wrong event")
+		}
 	case <-ctx.Done():
-		return errors.New("signer acceptance history check timed out")
+		return errors.New("signer acceptance recovery check timed out")
 	}
-	fmt.Printf("ephemeral NIP-46 delivery accepted at %s\n", target)
+	fmt.Printf("live and memory-recovered NIP-46 delivery accepted at %s\n", target)
 	return nil
 }
