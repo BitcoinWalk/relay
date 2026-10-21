@@ -98,7 +98,7 @@ func newChatRelay(store *chatstate.Store) *khatru.Relay {
 		if e.Kind == 9021 && !limits.allow("join:"+key.Hex(), 10, time.Minute, time.Now()) {
 			return true, "rate-limited: chat join limit"
 		}
-		if e.Kind != 9 && e.Kind != 9000 && e.Kind != 9001 && e.Kind != 9002 && e.Kind != 9007 && e.Kind != 9021 && e.Kind != 9022 {
+		if e.Kind != 9 && e.Kind != 7 && e.Kind != 9000 && e.Kind != 9001 && e.Kind != 9002 && e.Kind != 9007 && e.Kind != 9021 && e.Kind != 9022 {
 			return true, "restricted: unsupported chat kind"
 		}
 		return false, ""
@@ -172,7 +172,7 @@ func newChatRelay(store *chatstate.Store) *khatru.Relay {
 			return false, ""
 		}
 		if !chatFilter(f) {
-			return true, "restricted: request one chat group and kind 9 explicitly"
+			return true, "restricted: request one chat group and supported chat kinds explicitly"
 		}
 		mu.Lock()
 		n := 0
@@ -283,7 +283,7 @@ func newChatRelay(store *chatstate.Store) *khatru.Relay {
 		mu.Unlock()
 		for _, sub := range subs {
 			if membershipFilter(sub.filter, sub.key) {
-				if e.Kind == 9 {
+				if e.Kind == 9 || e.Kind == 7 {
 					continue
 				}
 				_ = store.DeliverMembershipStatus(sub.key, sub.filter, func(stored nostr.Event) error {
@@ -300,7 +300,7 @@ func newChatRelay(store *chatstate.Store) *khatru.Relay {
 				continue
 			}
 			if metadataFilter(sub.filter) {
-				if e.Kind == 9 {
+				if e.Kind == 9 || e.Kind == 7 {
 					continue
 				}
 				_ = store.DeliverMetadata(sub.key, sub.filter, func(stored nostr.Event) error {
@@ -316,7 +316,7 @@ func newChatRelay(store *chatstate.Store) *khatru.Relay {
 				})
 				continue
 			}
-			if e.Kind != 9 {
+			if e.Kind != 9 && e.Kind != 7 {
 				continue
 			}
 			if !sub.filter.Matches(e) {

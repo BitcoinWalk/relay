@@ -15,7 +15,7 @@ import (
 
 func chatCommandKind(kind nostr.Kind) bool {
 	switch kind {
-	case 9, 9000, 9001, 9002, 9007, 9021, 9022:
+	case 7, 9, 9000, 9001, 9002, 9007, 9021, 9022:
 		return true
 	default:
 		return false
