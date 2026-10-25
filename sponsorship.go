@@ -29,6 +29,7 @@ type sponsorship struct {
 	LogoHash           string           `json:"logoHash,omitempty"`
 	StartsAt           *int64           `json:"startsAt,omitempty"`
 	EndsAt             *int64           `json:"endsAt,omitempty"`
+	PriceSats          *int64           `json:"priceSats,omitempty"`
 	PreviousRevisionID string           `json:"previousRevisionId,omitempty"`
 }
 
@@ -67,6 +68,9 @@ func parseSponsorship(event nostr.Event) (sponsorship, error) {
 	}
 	if value.StartsAt != nil && *value.StartsAt < 0 || value.EndsAt != nil && *value.EndsAt <= 0 || value.StartsAt != nil && value.EndsAt != nil && *value.EndsAt <= *value.StartsAt {
 		return value, errors.New("invalid: sponsorship dates")
+	}
+	if value.PriceSats != nil && (value.Scope.Type != "walk" || *value.PriceSats < 1000 || *value.PriceSats > 10000000) {
+		return value, errors.New("invalid: sponsorship price")
 	}
 	if value.PreviousRevisionID != "" && !hexKeyPattern.MatchString(value.PreviousRevisionID) {
 		return value, errors.New("invalid: sponsorship previous revision")

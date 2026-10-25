@@ -78,3 +78,37 @@ func TestSponsorshipLogoVersionBinding(t *testing.T) {
 		})
 	}
 }
+
+func TestSponsorshipWalkPriceCompatibility(t *testing.T) {
+	admin := nostr.Generate()
+	adminPK := nostr.GetPublicKey(admin)
+	relay, db, err := newRelay(filepath.Join(t.TempDir(), "events.db"), map[nostr.PubKey]bool{adminPK: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { relay.DisableExpirationManager(); db.Close() }()
+	unitOrganizerPolicy(relay, enableOrganizers(relay, db, adminPK))
+	price := int64(10000)
+	value := sponsorship{Version: 1, Scope: sponsorshipScope{Type: "walk", CityID: cityA, Address: cityA + ":2026-11-07"}, Mode: "empty", PriceSats: &price}
+	body, _ := json.Marshal(value)
+	key := sponsorshipKey(value.Scope)
+	event := nostr.Event{Kind: sponsorshipKind, CreatedAt: nostr.Now(), Tags: nostr.Tags{{"d", sponsorshipID + ":" + key + ":00000000-0000-4000-8000-000000000001"}, {"i", sponsorshipID}, {"scope", key}, {"mode", value.Mode}, {"client", "bitcoinwalk.org"}}, Content: string(body)}
+	if err := event.Sign(admin); err != nil {
+		t.Fatal(err)
+	}
+	accept(t, relay, event)
+	city := value
+	city.Scope = sponsorshipScope{Type: "city", CityID: cityA}
+	cityBody, _ := json.Marshal(city)
+	event.Content = string(cityBody)
+	if _, err := parseSponsorship(event); err == nil {
+		t.Fatal("city sponsorship price accepted")
+	}
+	low := int64(999)
+	value.PriceSats = &low
+	lowBody, _ := json.Marshal(value)
+	event.Content = string(lowBody)
+	if _, err := parseSponsorship(event); err == nil {
+		t.Fatal("out-of-range sponsorship price accepted")
+	}
+}
