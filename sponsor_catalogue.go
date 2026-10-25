@@ -124,11 +124,24 @@ func (p *organizerPolicy) checkSponsorCatalogue(event nostr.Event) error {
 	if current == nil && value.PreviousRevisionID != "" {
 		return errors.New("invalid: first sponsor catalogue revision cannot reference a predecessor")
 	}
+	if value.RecordType == "claim" && current == nil && value.State == "withdrawn" {
+		return errors.New("invalid: sponsor catalogue withdrawal requires an active predecessor")
+	}
 	if current != nil && (value.PreviousRevisionID != current.ID.Hex() || event.CreatedAt <= current.CreatedAt) {
 		return errors.New("restricted: sponsor catalogue changed; reload before publishing")
 	}
 	if value.RecordType == "claim" {
 		return nil
+	}
+	sponsorKey, keyErr := nostr.PubKeyFromHex(value.SponsorPubkey)
+	if keyErr != nil {
+		return errors.New("invalid: sponsor catalogue identity")
+	}
+	if latestClaim := p.latestSponsorCatalogue(sponsorKey, "claim", value.SponsorPubkey); latestClaim != nil {
+		claim, claimErr := parseSponsorCatalogue(*latestClaim)
+		if claimErr != nil || claim.State == "withdrawn" {
+			return errors.New("restricted: withdrawn sponsor catalogue profile cannot be approved")
+		}
 	}
 	source := p.byID(value.SourceEventID)
 	if source == nil {
@@ -142,7 +155,8 @@ func (p *organizerPolicy) checkSponsorCatalogue(event nostr.Event) error {
 		return nil
 	}
 	claim, parseErr := parseSponsorCatalogue(*source)
-	if parseErr != nil || claim.RecordType != "claim" || source.PubKey.Hex() != value.SponsorPubkey || claim.State != "active" || claim.DisplayName != value.DisplayName || claim.Website != value.Website || !p.approvedSponsorLogo(value.SponsorPubkey, value.LogoHash) {
+	latestClaim := p.latestSponsorCatalogue(source.PubKey, "claim", value.SponsorPubkey)
+	if parseErr != nil || claim.RecordType != "claim" || source.PubKey.Hex() != value.SponsorPubkey || latestClaim == nil || latestClaim.ID != source.ID || claim.State != "active" || claim.DisplayName != value.DisplayName || claim.Website != value.Website || !p.approvedSponsorLogo(value.SponsorPubkey, value.LogoHash) {
 		return errors.New("restricted: sponsor catalogue approval does not match the sponsor claim and approved artwork")
 	}
 	return nil

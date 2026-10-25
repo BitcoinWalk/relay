@@ -78,10 +78,33 @@ func TestSponsorCatalogueClaimRequiresSponsorAndExactSuccessor(t *testing.T) {
 	unitOrganizerPolicy(relay, enableOrganizers(relay, db, adminPK))
 	claim := sponsorCatalogueRecord{Version: 1, RecordType: "claim", SponsorPubkey: sponsorPK.Hex(), State: "active", DisplayName: "TeamToxic", Website: "https://teamtoxic.example/"}
 	deny(t, relay, catalogueEvent(t, outsider, claim, 0))
+	firstWithdrawal := claim
+	firstWithdrawal.State = "withdrawn"
+	deny(t, relay, catalogueEvent(t, sponsor, firstWithdrawal, 1))
 	first := catalogueEvent(t, sponsor, claim, 1)
 	accept(t, relay, first)
 	claim.State = "withdrawn"
 	deny(t, relay, catalogueEvent(t, sponsor, claim, 2))
 	claim.PreviousRevisionID = first.ID.Hex()
 	accept(t, relay, catalogueEvent(t, sponsor, claim, 3))
+}
+
+func TestSponsorCatalogueCannotApproveAClaimAfterSponsorWithdraws(t *testing.T) {
+	admin, sponsor := nostr.Generate(), nostr.Generate()
+	adminPK, sponsorPK := nostr.GetPublicKey(admin), nostr.GetPublicKey(sponsor)
+	relay, db, err := newRelay(filepath.Join(t.TempDir(), "events.db"), map[nostr.PubKey]bool{adminPK: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { relay.DisableExpirationManager(); db.Close() }()
+	unitOrganizerPolicy(relay, enableOrganizers(relay, db, adminPK))
+	assignment := approvedSponsorAssignment(t, admin, sponsorPK.Hex())
+	accept(t, relay, assignment)
+	claim := sponsorCatalogueRecord{Version: 1, RecordType: "claim", SponsorPubkey: sponsorPK.Hex(), State: "active", DisplayName: "TeamToxic", Website: "https://teamtoxic.example/"}
+	active := catalogueEvent(t, sponsor, claim, 1)
+	accept(t, relay, active)
+	claim.State, claim.PreviousRevisionID = "withdrawn", active.ID.Hex()
+	accept(t, relay, catalogueEvent(t, sponsor, claim, 2))
+	approval := sponsorCatalogueRecord{Version: 1, RecordType: "approval", SponsorPubkey: sponsorPK.Hex(), Status: "approved", DisplayName: "TeamToxic", Website: "https://teamtoxic.example/", LogoHash: "b" + strings.Repeat("0", 63), Source: "self-claim", SourceEventID: active.ID.Hex(), SourceCityID: cityA, SourceScopeKey: "city:" + cityA}
+	deny(t, relay, catalogueEvent(t, admin, approval, 3))
 }
