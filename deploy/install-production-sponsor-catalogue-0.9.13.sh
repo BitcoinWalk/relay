@@ -5,9 +5,9 @@ test "$EUID" -eq 0 || { echo 'Run this installer with sudo.' >&2; exit 1; }
 test "$#" -eq 0 || { echo "Usage: $0" >&2; exit 1; }
 root_dir=$(cd "$(dirname "$0")/.." && pwd); cd "$root_dir"
 
-checksums=PRODUCTION-SPONSOR-CATALOGUE-0.9.12-SHA256SUMS
-artifact="$root_dir/bitcoinwalk-relay-production-sponsor-catalogue-0.9.12"
-version_template="$root_dir/deploy/zzz-production-sponsor-catalogue-version-0.9.12.conf"
+checksums=PRODUCTION-SPONSOR-CATALOGUE-0.9.13-SHA256SUMS
+artifact="$root_dir/bitcoinwalk-relay-production-sponsor-catalogue-0.9.13"
+version_template="$root_dir/deploy/zzz-production-sponsor-catalogue-version-0.9.13.conf"
 service=bitcoinwalk-relay-production.service
 binary=/opt/bitcoinwalk-relay-production/bitcoinwalk-relay
 database=/var/lib/bitcoinwalk-relay-production/events.db
@@ -16,7 +16,7 @@ registry=/etc/bitcoinwalk-replication-production/registry.json
 ledger=/etc/bitcoinwalk-replication-production/entitlements.json
 version_dropin=/etc/systemd/system/bitcoinwalk-relay-production.service.d/zzz-sponsor-catalogue-version.conf
 expected_current=bitcoinwalk-production-initial-history-v2
-expected_version=bitcoinwalk-production-sponsor-catalogue-0.9.12
+expected_version=bitcoinwalk-production-sponsor-catalogue-0.9.13
 
 wait_health(){
  local ready=false
@@ -101,5 +101,5 @@ for unit in "$service" bitcoinwalk-relay.service bitcoinwalk-guide.service; do s
 
 (cd "$backup" && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum >SHA256SUMS)
 completed=true; trap - ERR EXIT HUP INT TERM
-echo "Production sponsor catalogue policy accepted on relay 0.9.12. Backup: $backup"
+echo "Production sponsor catalogue policy accepted on relay 0.9.13. Backup: $backup"
 echo 'Existing signed events, database ownership, replication journal, registry and entitlement ledger remained exact across two restarts.'
