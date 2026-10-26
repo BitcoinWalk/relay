@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
 
 test "$EUID" -eq 0 || { echo 'Run this installer with sudo.' >&2; exit 1; }
 test "$#" -eq 0 || { echo "Usage: $0" >&2; exit 1; }
@@ -42,10 +42,14 @@ cp -p "$binary" "$backup/relay.before"
 cp -p "$registry" "$backup/registry.before.json"
 cp -p "$ledger" "$backup/entitlements.before.json"
 curl --fail --silent --max-time 5 http://127.0.0.1:3345/api/healthz >"$backup/app-health.before.json"
-activated=false; completed=false
+activated=false; completed=false; failure_line=unknown; failure_command=unknown
+trap 'failure_line=$LINENO; failure_command=$BASH_COMMAND' ERR
 recover(){
  code=$?; trap - EXIT HUP INT TERM
  if "$activated"; then
+  systemctl status "$service" --no-pager -l >"$backup/candidate-status.txt" 2>&1 || true
+  journalctl -u "$service" --since "5 minutes ago" --no-pager -n 120 >"$backup/candidate-journal.txt" 2>&1 || true
+  curl --silent --show-error --max-time 3 -H 'Accept: application/nostr+json' http://127.0.0.1:3340/ >"$backup/candidate-nip11.json" 2>"$backup/candidate-curl-error.txt" || true
   systemctl stop "$service" >/dev/null 2>&1 || true
   install -o root -g root -m 0755 "$backup/relay.before" "$binary"
   rm -f "$version_dropin"
@@ -53,7 +57,10 @@ recover(){
  fi
  systemctl reset-failed "$service" >/dev/null 2>&1 || true
  systemctl start "$service" >/dev/null 2>&1 || true
- if ! "$completed"; then echo "Production sponsor-catalogue upgrade failed; accepted production relay restored. Backup: $backup" >&2; fi
+ if ! "$completed"; then
+  echo "Production sponsor-catalogue upgrade failed at line $failure_line: $failure_command" >&2
+  echo "Accepted production relay restored. Backup: $backup" >&2
+ fi
  exit "$code"
 }
 trap recover EXIT HUP INT TERM
@@ -93,6 +100,6 @@ cmp "$backup/app-health.before.json" "$backup/app-health.after.json"
 for unit in "$service" bitcoinwalk-relay.service bitcoinwalk-guide.service; do systemctl is-active --quiet "$unit"; done
 
 (cd "$backup" && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum >SHA256SUMS)
-completed=true; trap - EXIT HUP INT TERM
+completed=true; trap - ERR EXIT HUP INT TERM
 echo "Production sponsor catalogue policy accepted on relay 0.9.12. Backup: $backup"
 echo 'Existing signed events, database ownership, replication journal, registry and entitlement ledger remained exact across two restarts.'
