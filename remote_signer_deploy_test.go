@@ -38,3 +38,25 @@ func TestRemoteSignerDeploymentIsIsolatedAndEphemeral(t *testing.T) {
 		}
 	}
 }
+
+func TestRemoteSignerRecoveryUpgradeRemainsMemoryOnly(t *testing.T) {
+	script, err := os.ReadFile("deploy/upgrade-remote-signer-recovery-0.8.63.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(script)
+	for _, required := range []string{
+		"REMOTE-SIGNER-RECOVERY-0.8.63-SHA256SUMS",
+		"bitcoinwalk-relay-remote-signer-0.8.63",
+		"systemctl restart bitcoinwalk-remote-signer.service",
+		"RELAY_SIGNER_ACCEPTANCE_URL=wss://remote.bitcoinwalk.org/",
+		"test ! -e /var/lib/bitcoinwalk-remote-signer",
+	} {
+		if !strings.Contains(text, required) {
+			t.Fatalf("recovery upgrade missing %q", required)
+		}
+	}
+	if strings.Contains(text, "StateDirectory") || strings.Contains(text, "RELAY_DB") {
+		t.Fatal("recovery upgrade must not add persistent signer storage")
+	}
+}

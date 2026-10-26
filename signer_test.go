@@ -60,20 +60,52 @@ func TestSignerTransport(t *testing.T) {
 			t.Fatalf("accepted %d", kind)
 		}
 	}
-	later, err := receiver.Subscribe(ctx, f, nostr.SubscriptionOptions{})
+	later, err := receiver.Subscribe(ctx, nostr.Filter{
+		Kinds: []nostr.Kind{24133}, Tags: nostr.TagMap{"p": []string{recipient}}, Limit: 1,
+	}, nostr.SubscriptionOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer later.Unsub()
 	select {
-	case <-later.Events:
-		t.Fatal("ephemeral event persisted")
-	case <-later.EndOfStoredEvents:
+	case got := <-later.Events:
+		if got.ID != event.ID {
+			t.Fatal("wrong recovery event")
+		}
 	case <-ctx.Done():
-		t.Fatal("history timeout")
+		t.Fatal("recovery replay timeout")
 	}
-	if r.StoreEvent != nil || r.QueryStored != nil {
-		t.Fatal("unexpected storage")
+	if r.StoreEvent != nil || r.QueryStored == nil {
+		t.Fatal("expected memory-only recovery without persistent storage")
+	}
+}
+
+func TestSignerReplayExpiresAndStaysBounded(t *testing.T) {
+	now := time.Unix(1_000, 0)
+	buffer := newSignerReplayBuffer(time.Minute, 2, func() time.Time { return now })
+	key := nostr.Generate()
+	recipient := nostr.GetPublicKey(nostr.Generate()).Hex()
+	makeEvent := func(content string) nostr.Event {
+		event := nostr.Event{Kind: 24133, CreatedAt: nostr.Timestamp(now.Unix()), Tags: nostr.Tags{{"p", recipient}}, Content: content}
+		event.Sign(key)
+		return event
+	}
+	buffer.add(makeEvent("first"))
+	buffer.add(makeEvent("second"))
+	buffer.add(makeEvent("third"))
+
+	filter := nostr.Filter{Kinds: []nostr.Kind{24133}, Tags: nostr.TagMap{"p": []string{recipient}}, Limit: 8}
+	got := make([]nostr.Event, 0, 2)
+	for event := range buffer.query(filter) {
+		got = append(got, event)
+	}
+	if len(got) != 2 || got[0].Content != "third" || got[1].Content != "second" {
+		t.Fatalf("unexpected bounded replay: %#v", got)
+	}
+
+	now = now.Add(time.Minute + time.Second)
+	for range buffer.query(filter) {
+		t.Fatal("expired signer envelope was replayed")
 	}
 }
 

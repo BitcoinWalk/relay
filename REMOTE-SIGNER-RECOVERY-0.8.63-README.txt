@@ -1,0 +1,18 @@
+BitcoinWalk remote signer recovery 0.8.63
+
+This upgrade keeps at most 256 encrypted NIP-46 envelopes in process memory for
+two minutes. It allows Walkie Talkie to recover an approval response after
+Android suspends its WebSocket while Amber is in front.
+
+No signing traffic is written to disk. Restarting the service clears the entire
+recovery window. The relay continues to accept only signed kind 24133 envelopes
+and exact one-recipient subscriptions.
+
+Install on the production host:
+
+  cd /home/bitcoinwalk/incoming/bitcoinwalk-remote-signer-recovery-0.8.63
+  sudo ./deploy/upgrade-remote-signer-recovery-0.8.63.sh
+
+The installer verifies every packaged file, requires the accepted 0.8.62
+binary, creates a rollback backup, restarts the isolated service, and proves
+both live delivery and short reconnect recovery over the public TLS endpoint.

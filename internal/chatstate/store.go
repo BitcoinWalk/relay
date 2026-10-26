@@ -289,6 +289,30 @@ func (s *Store) apply(e nostr.Event, authenticated nostr.PubKey, now time.Time, 
 				return errors.New("restricted: public open-join metadata required")
 			}
 		case "h":
+		case "e":
+			if e.Kind != 9 && e.Kind != 7 {
+				return errors.New("invalid: unexpected message reference")
+			}
+			if _, err := tag(e, "e", e.Kind == 7); err != nil {
+				return err
+			}
+		case "emoji":
+			if e.Kind != 7 || len(t) != 3 || t[1] == "" || t[2] == "" {
+				return errors.New("invalid: custom reaction tag")
+			}
+			count := 0
+			for _, other := range e.Tags {
+				if len(other) > 0 && other[0] == "emoji" {
+					count++
+				}
+			}
+			if count != 1 || !validID.MatchString(t[1]) {
+				return errors.New("invalid: custom reaction tag")
+			}
+			u, err := url.Parse(t[2])
+			if err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil {
+				return errors.New("invalid: custom reaction URL")
+			}
 		case "client":
 			if _, err := tag(e, "client", false); err != nil {
 				return err
@@ -453,9 +477,37 @@ func (s *Store) apply(e nostr.Event, authenticated nostr.PubKey, now time.Time, 
 					action = "ban"
 				}
 			}
-		case 9:
+		case 9, 7:
 			if !state.Members[author] || state.Banned[author] {
 				return ErrDenied
+			}
+			reference, err := tag(e, "e", e.Kind == 7)
+			if err != nil {
+				return err
+			}
+			if reference != "" {
+				messageID, err := nostr.IDFromHex(reference)
+				if err != nil || messageID.Hex() != reference {
+					return errors.New("invalid: message reference")
+				}
+				seq := b.Bucket([]byte("seen")).Get([]byte(reference))
+				if seq == nil {
+					return errors.New("invalid: referenced message is not in this group")
+				}
+				data := b.Bucket([]byte("messages")).Get(seq)
+				if data == nil {
+					return errors.New("invalid: referenced event is not a message")
+				}
+				var target Record
+				if err := json.Unmarshal(data, &target); err != nil {
+					return err
+				}
+				if target.Event.Kind != 9 {
+					return errors.New("invalid: reactions and replies target kind 9 messages")
+				}
+			}
+			if e.Kind == 7 && (strings.TrimSpace(e.Content) == "" || len(e.Content) > 128) {
+				return errors.New("invalid: reaction must contain 1-128 bytes")
 			}
 			action = "message"
 		default:

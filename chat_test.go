@@ -129,7 +129,7 @@ func TestChatWebSocketMembershipAndRevocation(t *testing.T) {
 		t.Fatal("metadata query stalled")
 	}
 	discovery.Unsub()
-	f := nostr.Filter{Kinds: []nostr.Kind{9}, Tags: nostr.TagMap{"h": []string{"a"}}}
+	f := nostr.Filter{Kinds: []nostr.Kind{9, 7}, Tags: nostr.TagMap{"h": []string{"a"}}}
 	rejected := func(c *nostr.Relay, filter nostr.Filter) {
 		sub, err := c.Subscribe(ctx, filter, nostr.SubscriptionOptions{})
 		if err != nil {
@@ -236,6 +236,16 @@ func TestChatWebSocketMembershipAndRevocation(t *testing.T) {
 	case <-sub.EndOfStoredEvents:
 	case <-ctx.Done():
 		t.Fatal("missing EOSE")
+	}
+	reaction := event(user, 7, "a", "👍", nostr.Tag{"e", first.ID.Hex()})
+	pub(member, reaction)
+	select {
+	case got := <-sub.Events:
+		if got.ID != reaction.ID {
+			t.Fatal("wrong live reaction")
+		}
+	case <-ctx.Done():
+		t.Fatal("missing live reaction")
 	}
 	// Armada may repeat AUTH as other reads/writes challenge the same socket.
 	// Reauthenticating the same identity must not silently discard its live feed.

@@ -1,0 +1,21 @@
+BitcoinWalk shared chat interactions 0.9.5
+
+This guarded production upgrade adds NIP-29 group replies and NIP-25 reactions
+to the existing shared relay at wss://chat.bitcoinwalk.org/.
+
+The installer:
+- verifies every packaged artifact and the exact accepted live binary, service
+  unit and public configuration;
+- rehearses the candidate against a copy of the production database;
+- proves that the public relay identity and group metadata do not change;
+- backs up the binary, unit, configuration, credential and database;
+- checks the logical database digest before and after activation and restart;
+- restores the accepted binary and pre-activation database automatically if
+  any activation check fails.
+
+Run on the BitcoinWalk server from this package directory:
+
+  sudo ./deploy/upgrade-shared-chat-interactions-0.9.5.sh
+
+This package does not change Caddy, DNS, group membership, relay credentials,
+event-relay services, city relay services, or any application deployment.

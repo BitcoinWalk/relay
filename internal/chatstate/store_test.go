@@ -261,3 +261,44 @@ func TestFilteredHistoryLimitCountsMatches(t *testing.T) {
 		t.Fatalf("filtered history: %d %v", count, err)
 	}
 }
+
+func TestRepliesAndReactionsStayInsideTheirGroup(t *testing.T) {
+	s, admin, _ := openTest(t)
+	user := nostr.Generate()
+	apply(t, s, event(t, user, 9021, "city-a"))
+
+	target := event(t, admin, 9, "city-a")
+	apply(t, s, target)
+	reply := event(t, user, 9, "city-a", nostr.Tag{"e", target.ID.Hex()})
+	apply(t, s, reply)
+	reaction := event(t, user, 7, "city-a", nostr.Tag{"e", target.ID.Hex()})
+	reaction.Content = "👍"
+	reaction.Sign(user)
+	apply(t, s, reaction)
+
+	wrongGroup := event(t, admin, 9, "city-b")
+	apply(t, s, wrongGroup)
+	if err := s.Apply(event(t, user, 9, "city-a", nostr.Tag{"e", wrongGroup.ID.Hex()}), nostr.GetPublicKey(user), now); err == nil {
+		t.Fatal("cross-group reply accepted")
+	}
+	if err := s.Apply(event(t, user, 7, "city-a", nostr.Tag{"e", wrongGroup.ID.Hex()}), nostr.GetPublicKey(user), now); err == nil {
+		t.Fatal("cross-group reaction accepted")
+	}
+	if err := s.Apply(event(t, user, 7, "city-a"), nostr.GetPublicKey(user), now); err == nil {
+		t.Fatal("reaction without target accepted")
+	}
+
+	var delivered []nostr.Kind
+	err := s.DeliverFilteredHistory("city-a", nostr.GetPublicKey(user), nostr.Filter{
+		Kinds: []nostr.Kind{9, 7}, Limit: 20,
+	}, func(e nostr.Event) error {
+		delivered = append(delivered, e.Kind)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(delivered) != 3 {
+		t.Fatalf("expected target, reply and reaction, got %v", delivered)
+	}
+}
