@@ -12,6 +12,7 @@ import (
 
 const sponsorCatalogueKind nostr.Kind = 30313
 const sponsorCatalogueID = "bitcoinwalk-sponsor-catalogue"
+const sponsorCatalogueAssetCityID = "00000000-0000-4000-8000-000000000000"
 
 type sponsorCatalogueRecord struct {
 	Version            int    `json:"version"`
@@ -43,6 +44,11 @@ func parseSponsorCatalogue(event nostr.Event) (sponsorCatalogueRecord, error) {
 	if value.RecordType == "claim" {
 		if event.PubKey.Hex() != value.SponsorPubkey || value.State != "active" && value.State != "withdrawn" || value.Status != "" || value.LogoHash != "" || value.Source != "" || value.SourceEventID != "" || value.SourceCityID != "" || value.SourceScopeKey != "" {
 			return value, errors.New("invalid: sponsor claim")
+		}
+	} else if value.RecordType == "intake" {
+		marker = value.Status
+		if value.State != "" || value.Status != "pending" || value.LogoHash != "" || value.Source != "" || value.SourceEventID != "" || value.SourceCityID != "" || value.SourceScopeKey != "" {
+			return value, errors.New("invalid: sponsor intake")
 		}
 	} else if value.RecordType == "approval" {
 		marker = value.Status
@@ -82,7 +88,7 @@ func parseSponsorCatalogue(event nostr.Event) (sponsorCatalogueRecord, error) {
 			return value, errors.New("restricted: unsupported sponsor catalogue tag")
 		}
 	}
-	if (value.PreviousRevisionID == "") != (previousCount == 0) || previousCount > 1 || previousID != value.PreviousRevisionID || value.RecordType == "claim" && sourceCount != 0 || value.RecordType == "approval" && (sourceCount != 1 || sourceID != value.SourceEventID) {
+	if (value.PreviousRevisionID == "") != (previousCount == 0) || previousCount > 1 || previousID != value.PreviousRevisionID || value.RecordType != "approval" && sourceCount != 0 || value.RecordType == "approval" && (sourceCount != 1 || sourceID != value.SourceEventID) {
 		return value, errors.New("invalid: sponsor catalogue references")
 	}
 	return value, nil
@@ -114,8 +120,8 @@ func (p *organizerPolicy) checkSponsorCatalogue(event nostr.Event) error {
 	if err != nil {
 		return err
 	}
-	if value.RecordType == "approval" && event.PubKey != p.admin {
-		return errors.New("restricted: only the super-admin can approve sponsor catalogue entries")
+	if (value.RecordType == "approval" || value.RecordType == "intake") && event.PubKey != p.admin {
+		return errors.New("restricted: only the super-admin can manage sponsor catalogue review records")
 	}
 	if p.byID(event.ID.Hex()) != nil {
 		return nil
@@ -131,6 +137,9 @@ func (p *organizerPolicy) checkSponsorCatalogue(event nostr.Event) error {
 		return errors.New("restricted: sponsor catalogue changed; reload before publishing")
 	}
 	if value.RecordType == "claim" {
+		return nil
+	}
+	if value.RecordType == "intake" {
 		return nil
 	}
 	sponsorKey, keyErr := nostr.PubKeyFromHex(value.SponsorPubkey)
@@ -156,7 +165,7 @@ func (p *organizerPolicy) checkSponsorCatalogue(event nostr.Event) error {
 	}
 	claim, parseErr := parseSponsorCatalogue(*source)
 	latestClaim := p.latestSponsorCatalogue(source.PubKey, "claim", value.SponsorPubkey)
-	if parseErr != nil || claim.RecordType != "claim" || source.PubKey.Hex() != value.SponsorPubkey || latestClaim == nil || latestClaim.ID != source.ID || claim.State != "active" || claim.DisplayName != value.DisplayName || claim.Website != value.Website || !p.approvedSponsorLogo(value.SponsorPubkey, value.LogoHash) {
+	if parseErr != nil || claim.RecordType != "claim" || source.PubKey.Hex() != value.SponsorPubkey || latestClaim == nil || latestClaim.ID != source.ID || claim.State != "active" || claim.DisplayName != value.DisplayName || claim.Website != value.Website || value.SourceCityID != sponsorCatalogueAssetCityID || value.SourceScopeKey != "catalogue:"+value.SponsorPubkey {
 		return errors.New("restricted: sponsor catalogue approval does not match the sponsor claim and approved artwork")
 	}
 	return nil
