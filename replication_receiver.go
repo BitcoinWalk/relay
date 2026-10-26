@@ -299,7 +299,12 @@ func (r *replicaReceiver) stage(envelope replicaDeliveryEnvelope) (*replicaRecei
 }
 
 func replicaInstallOrder(bundle *replicaBundle) []nostr.Event {
-	events := append([]nostr.Event(nil), bundle.Events...)
+	events := make([]nostr.Event, 0, len(bundle.Events))
+	for _, event := range bundle.Events {
+		if !slices.Contains(bundle.DependencyOnlyIDs, event.ID.Hex()) {
+			events = append(events, event)
+		}
+	}
 	slices.SortStableFunc(events, func(a, b nostr.Event) int {
 		rank := func(event nostr.Event) int {
 			switch {

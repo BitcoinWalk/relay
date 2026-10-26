@@ -44,7 +44,7 @@ func openTest(t *testing.T) (*Store, nostr.SecretKey, string) {
 	return s, admin, path
 }
 
-func TestMembershipIsolationAndDurableBan(t *testing.T) {
+func TestPublicReadMembershipWritesAndDurableBan(t *testing.T) {
 	s, admin, path := openTest(t)
 	user := nostr.Generate()
 	pk := nostr.GetPublicKey(user)
@@ -57,8 +57,9 @@ func TestMembershipIsolationAndDurableBan(t *testing.T) {
 	apply(t, s, join)
 	apply(t, s, message)
 	for _, key := range []nostr.PubKey{{}, outsider} {
-		if err := s.DeliverHistory("city-a", key, 20, func(nostr.Event) error { t.Fatal("leak"); return nil }); !errors.Is(err, ErrDenied) {
-			t.Fatal(err)
+		count := 0
+		if err := s.DeliverHistory("city-a", key, 20, func(nostr.Event) error { count++; return nil }); err != nil || count != 1 {
+			t.Fatalf("public history count=%d err=%v", count, err)
 		}
 	}
 	count := 0
@@ -71,8 +72,8 @@ func TestMembershipIsolationAndDurableBan(t *testing.T) {
 	}); err != nil || count != 1 {
 		t.Fatalf("history %d %v", count, err)
 	}
-	if err := s.DeliverHistory("city-b", pk, 20, func(nostr.Event) error { return nil }); !errors.Is(err, ErrDenied) {
-		t.Fatal("cross-city read", err)
+	if err := s.DeliverHistory("city-b", pk, 20, func(nostr.Event) error { return nil }); err != nil {
+		t.Fatal("public cross-city read", err)
 	}
 	if err := s.Apply(event(t, user, 9001, "city-a", nostr.Tag{"p", nostr.GetPublicKey(admin).Hex()}), pk, now); err == nil {
 		t.Fatal("member moderation accepted")
@@ -104,9 +105,9 @@ func TestMembershipIsolationAndDurableBan(t *testing.T) {
 		t.Fatal(err)
 	}
 	apply(t, reopened, event(t, admin, 9000, "city-a", nostr.Tag{"p", pk.Hex()}, nostr.Tag{"bitcoinwalk-unban", "true"}))
-	// Unban allows a new join; it does not itself restore membership.
-	if err := reopened.DeliverHistory("city-a", pk, 20, func(nostr.Event) error { return nil }); !errors.Is(err, ErrDenied) {
-		t.Fatal(err)
+	// Unban restores public read access but does not itself restore membership.
+	if err := reopened.DeliverHistory("city-a", pk, 20, func(nostr.Event) error { return nil }); err != nil {
+		t.Fatal("public read remained blocked after unban", err)
 	}
 	apply(t, reopened, join)
 }

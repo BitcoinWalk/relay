@@ -160,7 +160,7 @@ func (p *organizerPolicy) checkCalendar(event nostr.Event) error {
 		return err
 	}
 	if value, ok := exactCalendarTag(event, "bitcoinwalk"); ok && value == "initial-proposal-v1" {
-		return p.validateInitialProposal(event, nil, true)
+		return p.validateInitialProposal(event, nil, !p.retainedReplicaValidation)
 	}
 	if value, ok := exactCalendarTag(event, "bitcoinwalk"); ok && value == "occurrence-v1" {
 		return p.checkOrganizerCalendar(event, true)
@@ -217,6 +217,10 @@ func mustCalendarCity(event nostr.Event) string {
 // Initial proposals are stored before city approval but suppressed from reads
 // and broadcasts. Approval releases only the exact organizer-signed event.
 func (p *organizerPolicy) validateInitialProposal(event nostr.Event, city *cityDraft, enforceHorizon bool) error {
+	return p.validateInitialProposalWithAddress(event, city, enforceHorizon, true)
+}
+
+func (p *organizerPolicy) validateInitialProposalWithAddress(event nostr.Event, city *cityDraft, enforceHorizon, enforceAddress bool) error {
 	cityID, err := uniqueTag(event, "i")
 	if err != nil || !uuidPattern.MatchString(cityID) {
 		return errors.New("invalid: initial walk city identifier")
@@ -367,7 +371,7 @@ func (p *organizerPolicy) validateInitialProposal(event nostr.Event, city *cityD
 			}
 		}
 	}
-	if old := p.find(31923, &event.PubKey, d); old != nil && old.ID != event.ID {
+	if old := p.find(31923, &event.PubKey, d); enforceAddress && old != nil && old.ID != event.ID {
 		return errors.New("restricted: initial walk address already submitted")
 	}
 	return nil

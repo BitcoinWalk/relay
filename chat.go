@@ -54,6 +54,17 @@ func newChatRelay(store *chatstate.Store) *khatru.Relay {
 		key, ok := identities[khatru.GetConnection(ctx)]
 		return key, ok
 	}
+	readableChatFilter := func(f nostr.Filter, key nostr.PubKey) bool {
+		if !chatFilter(f) {
+			return false
+		}
+		for _, group := range f.Tags["h"] {
+			if store.CheckReadable(group, key) == nil {
+				return true
+			}
+		}
+		return false
+	}
 	r.OnAuth = func(ctx context.Context, key nostr.PubKey) {
 		ws := khatru.GetConnection(ctx)
 		mu.Lock()
@@ -165,11 +176,14 @@ func newChatRelay(store *chatstate.Store) *khatru.Relay {
 			return false, ""
 		}
 		key, ok := identity(ctx)
-		if !ok {
-			return true, "auth-required: authenticate before reading chat"
-		}
-		if membershipFilter(f, key) {
+		if ok && membershipFilter(f, key) {
 			return false, ""
+		}
+		if chatFilter(f) && readableChatFilter(f, key) {
+			return false, ""
+		}
+		if !ok {
+			return true, "auth-required: authenticate before reading private or unknown chat"
 		}
 		if !chatFilter(f) {
 			return true, "restricted: request one chat group and kind 9 explicitly"
@@ -184,11 +198,6 @@ func newChatRelay(store *chatstate.Store) *khatru.Relay {
 		mu.Unlock()
 		if n >= 16 {
 			return true, "rate-limited: too many chat subscriptions"
-		}
-		for _, group := range f.Tags["h"] {
-			if store.CheckMember(group, key) == nil {
-				return false, ""
-			}
 		}
 		return true, "restricted: current chat membership required"
 	}
@@ -226,7 +235,7 @@ func newChatRelay(store *chatstate.Store) *khatru.Relay {
 				})
 				return
 			}
-			if !ok || !chatFilter(f) {
+			if !chatFilter(f) || !readableChatFilter(f, key) {
 				return
 			}
 			deadline := time.Now().Add(5 * time.Second)
@@ -261,7 +270,7 @@ func newChatRelay(store *chatstate.Store) *khatru.Relay {
 		mu.Lock()
 		defer mu.Unlock()
 		key, ok := identities[ws]
-		if (ok && (chatFilter(f) || membershipFilter(f, key))) || metadataFilter(f) {
+		if readableChatFilter(f, key) || (ok && membershipFilter(f, key)) || metadataFilter(f) {
 			listeners[ssid] = chatListener{ssid, ws, id, key, f}
 		}
 	}

@@ -21,3 +21,23 @@ func (s *Store) CheckMember(id string, key nostr.PubKey) error {
 		return nil
 	})
 }
+
+// CheckReadable permits anonymous and nonmember reads for public groups while
+// retaining membership-only access for the canonical private organizer room.
+func (s *Store) CheckReadable(id string, key nostr.PubKey) error {
+	s.gate.RLock()
+	defer s.gate.RUnlock()
+	return s.db.View(func(tx *bbolt.Tx) error {
+		_, state, err := group(tx, id)
+		if err != nil {
+			return err
+		}
+		if state.Banned[key.Hex()] {
+			return ErrDenied
+		}
+		if (state.Private || state.ID == organizerGroupID) && !state.Members[key.Hex()] {
+			return ErrDenied
+		}
+		return nil
+	})
+}

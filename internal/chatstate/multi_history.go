@@ -9,7 +9,8 @@ import (
 )
 
 // DeliverMultiHistory merges bounded per-group histories while holding the
-// revocation gate through final delivery. Nonmember groups never enter results.
+// revocation gate through final delivery. Public groups are readable by
+// nonmembers; private groups never enter results for outsiders.
 func (s *Store) DeliverMultiHistory(key nostr.PubKey, f nostr.Filter, deliver func(nostr.Event) error) error {
 	ids := f.Tags["h"]
 	if len(ids) < 1 || len(ids) > 32 || f.Limit < 0 || f.Limit > 200 {
@@ -33,7 +34,8 @@ func (s *Store) DeliverMultiHistory(key nostr.PubKey, f nostr.Filter, deliver fu
 			if err != nil {
 				continue
 			}
-			if !state.Members[key.Hex()] || state.Banned[key.Hex()] {
+			if state.Banned[key.Hex()] ||
+				((state.Private || state.ID == organizerGroupID) && !state.Members[key.Hex()]) {
 				continue
 			}
 			cursor := b.Bucket([]byte("messages")).Cursor()

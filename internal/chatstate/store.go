@@ -498,8 +498,9 @@ func appendRecord(b *bbolt.Bucket, action string, e nostr.Event) error {
 	return nil
 }
 
-// DeliverHistory performs a fresh membership check and delivers at most 200
-// messages under a read gate. The callback must use bounded transport writes,
+// DeliverHistory performs a fresh visibility check and delivers at most 200
+// messages under a read gate. Public groups are readable without membership;
+// private groups remain member-only. The callback must use bounded transport writes,
 // must not call back into Store and must not retain events for later delivery.
 // This prevents a snapshot obtained before a ban being delivered after it.
 func (s *Store) DeliverHistory(id string, authenticated nostr.PubKey, limit int, deliver func(nostr.Event) error) error {
@@ -527,7 +528,8 @@ func (s *Store) deliverHistory(id string, authenticated nostr.PubKey, limit int,
 		if err != nil {
 			return err
 		}
-		if !state.Members[authenticated.Hex()] || state.Banned[authenticated.Hex()] {
+		if state.Banned[authenticated.Hex()] ||
+			((state.Private || state.ID == organizerGroupID) && !state.Members[authenticated.Hex()]) {
 			return ErrDenied
 		}
 		cursor := b.Bucket([]byte("messages")).Cursor()
@@ -549,8 +551,9 @@ func (s *Store) deliverHistory(id string, authenticated nostr.PubKey, limit int,
 	})
 }
 
-// DeliverLive only releases a stored message to a currently joined identity.
-// Supply an event ID, not caller-controlled message contents or group claims.
+// DeliverLive releases public-room messages to readers and private-room
+// messages only to current members. Supply an event ID, not caller-controlled
+// message contents or group claims.
 func (s *Store) DeliverLive(id string, authenticated nostr.PubKey, eventID nostr.ID, deliver func(nostr.Event) error) error {
 	s.gate.RLock()
 	defer s.gate.RUnlock()
@@ -559,7 +562,8 @@ func (s *Store) DeliverLive(id string, authenticated nostr.PubKey, eventID nostr
 		if err != nil {
 			return err
 		}
-		if !state.Members[authenticated.Hex()] || state.Banned[authenticated.Hex()] {
+		if state.Banned[authenticated.Hex()] ||
+			((state.Private || state.ID == organizerGroupID) && !state.Members[authenticated.Hex()]) {
 			return ErrDenied
 		}
 		seq := b.Bucket([]byte("seen")).Get([]byte(eventID.Hex()))
