@@ -109,6 +109,64 @@ func TestSignerReplayExpiresAndStaysBounded(t *testing.T) {
 	}
 }
 
+func TestSignerSubscriptionLimitSupportsAmberConnectionFanout(t *testing.T) {
+	r := newSignerRelay()
+	server := httptest.NewServer(r)
+	defer server.Close()
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	url := "ws" + strings.TrimPrefix(server.URL, "http")
+	receiver, err := nostr.RelayConnect(ctx, url, nostr.RelayOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer receiver.Close()
+
+	subscriptions := make([]*nostr.Subscription, 0, signerMaxSubscriptionsPerConnection)
+	for i := 0; i < signerMaxSubscriptionsPerConnection; i++ {
+		recipient := nostr.GetPublicKey(nostr.Generate()).Hex()
+		sub, err := receiver.Subscribe(ctx, nostr.Filter{
+			Kinds: []nostr.Kind{24133},
+			Tags:  nostr.TagMap{"p": []string{recipient}},
+		}, nostr.SubscriptionOptions{})
+		if err != nil {
+			t.Fatalf("subscribe %d: %v", i+1, err)
+		}
+		subscriptions = append(subscriptions, sub)
+		select {
+		case <-sub.EndOfStoredEvents:
+		case reason := <-sub.ClosedReason:
+			t.Fatalf("subscription %d rejected before the bounded limit: %s", i+1, reason)
+		case <-ctx.Done():
+			t.Fatalf("subscription %d did not become active", i+1)
+		}
+	}
+	defer func() {
+		for _, sub := range subscriptions {
+			sub.Unsub()
+		}
+	}()
+
+	overflow, err := receiver.Subscribe(ctx, nostr.Filter{
+		Kinds: []nostr.Kind{24133},
+		Tags:  nostr.TagMap{"p": []string{nostr.GetPublicKey(nostr.Generate()).Hex()}},
+	}, nostr.SubscriptionOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer overflow.Unsub()
+	select {
+	case reason := <-overflow.ClosedReason:
+		if !strings.Contains(reason, "rate-limited: subscriptions") {
+			t.Fatalf("unexpected overflow rejection: %s", reason)
+		}
+	case <-overflow.EndOfStoredEvents:
+		t.Fatal("accepted a subscription beyond the bounded per-connection limit")
+	case <-ctx.Done():
+		t.Fatal("overflow subscription was not rejected")
+	}
+}
+
 func TestSignerRejectsInvalidEnvelopesAndBroadReads(t *testing.T) {
 	r := newSignerRelay()
 	ctx := context.Background()

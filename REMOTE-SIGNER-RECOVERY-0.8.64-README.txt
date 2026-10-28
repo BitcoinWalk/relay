@@ -1,0 +1,20 @@
+BitcoinWalk remote signer recovery 0.8.64
+
+This upgrade allows each connected signer to keep up to 64 simultaneous,
+exact-recipient NIP-46 subscriptions. Amber retains one such subscription for
+each saved connection; the previous limit of eight caused newer Walkie Talkie
+connections to stop receiving follow-up requests after approval.
+
+The relay still accepts only signed kind 24133 envelopes and exact one-recipient
+subscriptions. Existing per-IP request limits, the two-minute memory-only replay
+window and the 256-envelope process-memory bound remain unchanged. No signing
+traffic is written to disk.
+
+Install on the production host:
+
+  cd /home/bitcoinwalk/incoming/bitcoinwalk-remote-signer-recovery-0.8.64
+  sudo ./deploy/upgrade-remote-signer-recovery-0.8.64.sh
+
+The installer verifies every packaged file, requires the accepted 0.8.63
+binary, creates a rollback backup, restarts the isolated service, and proves
+both live delivery and short reconnect recovery over the public TLS endpoint.

@@ -1,0 +1,4 @@
+44704beaabc595dd5057f052933a7147c4b88dd4bb7d48c7a13236f790366a2b  bitcoinwalk-relay-remote-signer-0.8.64
+928aa83b8efbb6c48bc28cf9006887b8826940f5ae05654080f0027f5016d551  REMOTE-SIGNER-RECOVERY-0.8.64-README.txt
+76edf1f100408acab102e2be3827673840e90628f84b6827fd22f651b686ea3d  deploy/bitcoinwalk-remote-signer.service
+49047c21a6118343aecf54ef63d573ad2f69cea48eaddf193564b59fcb24a13a  deploy/upgrade-remote-signer-recovery-0.8.64.sh

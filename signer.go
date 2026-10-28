@@ -16,8 +16,9 @@ import (
 )
 
 const (
-	signerReplayTTL = 2 * time.Minute
-	signerReplayMax = 256
+	signerReplayTTL                     = 2 * time.Minute
+	signerReplayMax                     = 256
+	signerMaxSubscriptionsPerConnection = 64
 )
 
 type signerReplayEntry struct {
@@ -95,7 +96,7 @@ func newSignerRelay() *khatru.Relay {
 	r.Info.Name = env("RELAY_SIGNER_NAME", "BitcoinWalk remote signing transport")
 	r.Info.Description = "NIP-46 transport with a short memory-only recovery window. Encrypted signing messages are never written to disk."
 	r.Info.SupportedNIPs = []any{1, 11, 46}
-	r.Info.Version = "bitcoinwalk-remote-signer-0.8.63"
+	r.Info.Version = "bitcoinwalk-remote-signer-0.8.64"
 	r.MaxMessageSize = 65536
 	r.WriteWait = 2 * time.Second
 	r.Negentropy = false
@@ -192,7 +193,7 @@ func newSignerRelay() *khatru.Relay {
 		mu.Lock()
 		defer mu.Unlock()
 		n := counts[khatru.GetConnection(ctx)]
-		if n >= 8 || !limits.allow("query:"+khatru.GetIP(ctx), 240, time.Minute, time.Now()) {
+		if n >= signerMaxSubscriptionsPerConnection || !limits.allow("query:"+khatru.GetIP(ctx), 240, time.Minute, time.Now()) {
 			return true, "rate-limited: subscriptions"
 		}
 		counts[khatru.GetConnection(ctx)]++
