@@ -77,6 +77,14 @@ type cityDecision struct {
 	Note            string   `json:"note"`
 }
 
+type cityEditorRequest struct {
+	Version              int    `json:"version"`
+	CityID               string `json:"cityId"`
+	Action               string `json:"action"`
+	EditorPubkey         string `json:"editorPubkey"`
+	AuthorizationEventID string `json:"authorizationEventId"`
+}
+
 func decisionInitialIDs(decision cityDecision) []string {
 	if len(decision.InitialEventIDs) > 0 {
 		return decision.InitialEventIDs
@@ -247,7 +255,7 @@ func (p *organizerPolicy) check(ctx context.Context, event nostr.Event) error {
 			return errors.New("restricted: workflow events cannot expire")
 		}
 	}
-	if event.Kind == 30303 || event.Kind == 30304 || event.Kind == contentPageKind || event.Kind == featureFlagsKind || event.Kind == eventModerationKind || event.Kind == sponsorshipKind || event.Kind == sponsorCatalogueKind || event.Kind == cityBrandKind {
+	if event.Kind == 30303 || event.Kind == 30304 || event.Kind == 30314 || event.Kind == contentPageKind || event.Kind == featureFlagsKind || event.Kind == eventModerationKind || event.Kind == sponsorshipKind || event.Kind == sponsorCatalogueKind || event.Kind == cityBrandKind {
 		d, err := uniqueTag(event, "d")
 		if err != nil {
 			return err
@@ -335,6 +343,51 @@ func (p *organizerPolicy) check(ctx context.Context, event nostr.Event) error {
 					return errors.New("restricted: previous revision belongs to another proposal")
 				}
 			}
+		}
+		return nil
+	case 30314:
+		var request cityEditorRequest
+		if json.Unmarshal([]byte(event.Content), &request) != nil {
+			return errors.New("invalid: city editor request JSON required")
+		}
+		d, dErr := uniqueTag(event, "d")
+		cityID, cityErr := uniqueTag(event, "i")
+		target, targetErr := uniqueTag(event, "p")
+		action, actionErr := uniqueTag(event, "action")
+		if request.Version != 1 || dErr != nil || cityErr != nil || targetErr != nil || actionErr != nil || !workflowAddress(d, request.CityID) || cityID != request.CityID || target != request.EditorPubkey || action != request.Action || !slices.Contains([]string{"add", "remove"}, request.Action) {
+			return errors.New("invalid: city editor request fields or tags")
+		}
+		if _, err := nostr.PubKeyFromHex(request.EditorPubkey); err != nil {
+			return errors.New("invalid: city editor public key")
+		}
+		references := 0
+		for _, tag := range event.Tags {
+			if len(tag) > 0 && tag[0] == "e" {
+				if len(tag) != 4 || tag[1] != request.AuthorizationEventID || tag[2] != "" || tag[3] != "current-authorization" {
+					return errors.New("invalid: city editor request authorization reference")
+				}
+				references++
+			}
+		}
+		grant, grantEvent, err := p.grant(request.CityID)
+		if err != nil {
+			return err
+		}
+		if grant == nil || grantEvent == nil || references != 1 || request.AuthorizationEventID != grantEvent.ID.Hex() {
+			return errors.New("restricted: city editor request must reference the current authorization")
+		}
+		if event.PubKey.Hex() != grant.owner() {
+			return errors.New("restricted: only the current city owner can request editor changes")
+		}
+		if request.EditorPubkey == grant.owner() {
+			return errors.New("restricted: current owner must remain a city editor")
+		}
+		exists := slices.Contains(grant.EditorPubkeys, request.EditorPubkey)
+		if request.Action == "add" && exists || request.Action == "remove" && !exists {
+			return errors.New("invalid: requested city editor change is already applied")
+		}
+		if request.Action == "add" && len(grant.EditorPubkeys) >= 100 {
+			return errors.New("restricted: city editor limit reached")
 		}
 		return nil
 	case 30302:
