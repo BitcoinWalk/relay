@@ -1,0 +1,44 @@
+services:
+  relay:
+    image: bitcoinwalk-relay-bangkok-combined-rehearsal:0.9.14
+    container_name: bitcoinwalk-relay-bangkok-combined-rehearsal
+    init: true
+    restart: "no"
+    read_only: true
+    user: "65532:65532"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 64
+    mem_limit: 512m
+    stop_grace_period: 20s
+    environment:
+      RELAY_LISTEN: 0.0.0.0:3347
+      RELAY_REPLICA_RECEIVER_CONTAINER_LISTEN: "true"
+      RELAY_DB: /data/events.db
+      RELAY_ORGANIZER_MODE: "true"
+      RELAY_REPLICA_RECEIVER_CITY: d7d1cda8-7a58-42ad-ab60-c4bad61dab9a
+      RELAY_REPLICA_RECEIVER_SERVICE_PUBKEY: a6c0c0aba1385505e1e1db704934a67d93fac6c5561d8f256e6dcac1df2ed448
+      RELAY_REPLICA_RECEIVER_DESTINATION: wss://bangkok.bitcoinwalk.org/
+      RELAY_CHAT_COMBINED: "true"
+      RELAY_CHAT_URL: wss://bangkok.bitcoinwalk.org
+      RELAY_CHAT_DB: /data/chat.db
+      RELAY_CHAT_KEY_FILE: /data/chat-relay-key
+      RELAY_NAME: BitcoinWalk Bangkok relay
+      RELAY_VERSION: bitcoinwalk-city-community-relay-0.9.14-rehearsal
+      RELAY_DESCRIPTION: Isolated rehearsal of the combined Bangkok event and NIP-29 community relay.
+      RELAY_LANDING_TEXT: BitcoinWalk Bangkok combined-relay rehearsal. Not a public endpoint.
+    volumes:
+      - /var/lib/bitcoinwalk-city-relays/bangkok-combined-rehearsal:/data
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=32m,mode=0700,uid=65532,gid=65532
+    expose:
+      - "3347"
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true
+    name: root_my_custom_network
