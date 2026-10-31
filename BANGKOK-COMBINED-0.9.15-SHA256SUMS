@@ -1,0 +1,9 @@
+b61698d8dafe319ced8f7d53d5102394f0420b29fdd2e56d5e4c893296c1c5b3  BANGKOK-COMBINED-0.9.15-README.txt
+73e0bb2ff8f845f4ae15a6ac4af27fd220c7b233da8756027fa3ce6d5ae50eeb  bitcoinwalk-relay-bangkok-combined-0.9.15
+1c934640f5933dcaaa3b447d152980d2ebc22077a62f9f94711aa545ce5b753f  replica-audit-bangkok-combined-0.9.15
+74c72aaa7498c539e7adbeb8dc9b5d790898580e2418433269357cca7045cc25  combined-chat-probe-0.9.15
+8c40ae25546e6f6b76db19f053b1485b6f222129418a9fe87c4c7a0188b98bb5  deploy/Dockerfile.bangkok-combined-0.9.15
+3fed36f56159380e4ee895249eae99ff877d01f5ac6e53452319eee23ccf260a  deploy/compose.bangkok-combined-rehearsal-0.9.15.yaml
+7f41d86da66a442f2693feefa8fab7591e31bbcdab31ccff390ce4e8ea93e4e7  deploy/compose.bangkok-combined-0.9.15.yaml
+6225361599d78320fd72ea7adfc0631adfa1822c8a6022875ed69fb43d92dd93  deploy/rehearse-bangkok-combined-0.9.15.sh
+1662ae332dc6bf8a89b172437c8a8617f0b828c71afa135ab65dc6ffc05d6ce2  deploy/activate-bangkok-combined-0.9.15.sh

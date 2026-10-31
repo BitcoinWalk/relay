@@ -1,0 +1,29 @@
+BitcoinWalk Bangkok combined relay 0.9.15
+
+This package upgrades the existing Bangkok paid-city receiver to a combined
+event and NIP-29 community relay. The event database remains authoritative and
+unchanged; the NIP-29 database and relay identity use separate files.
+
+The first command is a non-public rehearsal. It briefly pauses the Bangkok
+receiver to make a consistent event copy, immediately restores the accepted
+public receiver, then validates an isolated candidate across a restart. It does
+not change DNS, the gateway registry, the public container or signed app data.
+
+  cd /home/bitcoinwalk/incoming/bitcoinwalk-bangkok-combined-0.9.15
+  sudo ./deploy/rehearse-bangkok-combined-0.9.15.sh
+
+Keep the exact evidence path printed by the successful rehearsal. Use it as the
+only argument to the activation command:
+
+  sudo ./deploy/activate-bangkok-combined-0.9.15.sh \
+    /var/backups/bitcoinwalk-bangkok-combined-rehearsal.EXACT_ID
+
+Both commands verify the package checksums and Bangkok's exact city, endpoint,
+container image, private Docker topology and event history. Activation reuses
+the rehearsed NIP-29 identity, proves exact events and isolated chat state over
+two starts, and restores the accepted 0.8.92 receiver automatically on failure.
+The observed receiver baseline is currently an exact empty occurrence set;
+empty is accepted only when both audit sides match and all signature and privacy
+checks continue to pass.
+No group is created by this package. After activation, create and verify the
+Bangkok Armada group through Monitoring in the BitcoinWalk super-admin app.
