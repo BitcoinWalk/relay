@@ -317,6 +317,17 @@ func run() error {
 			organizer.cityRevisionAutomation = &automation
 			log.Printf("City revision automation admits content-only editor revisions from dedicated key %s", automation.Hex())
 		}
+		if automationHex := os.Getenv("RELAY_NEW_CITY_AUTOMATION_PUBKEY"); automationHex != "" {
+			automation, err := nostr.PubKeyFromHex(automationHex)
+			if err != nil || automation == organizer.admin {
+				return errors.New("invalid new city automation public key")
+			}
+			if !writers[automation] {
+				return errors.New("new city automation key must be an authenticated relay writer")
+			}
+			organizer.newCityAutomation = &automation
+			log.Printf("New city automation admits exact Basic submissions from dedicated key %s", automation.Hex())
+		}
 		log.Print("Organizer mode enabled; city approvals and editor lists require the super-admin")
 		journalPath := os.Getenv("RELAY_REPLICA_JOURNAL")
 		registryPath := os.Getenv("RELAY_REPLICA_REGISTRY")

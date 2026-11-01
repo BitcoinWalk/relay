@@ -23,6 +23,8 @@ var uuidPattern = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-
 var slugPattern = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
 
 const automatedCityRevisionNote = "AUTOMATED_CITY_REVISION: approved content-only editor revision"
+const automatedNewCityNote = "AUTOMATED_NEW_CITY: approved exact signed first walk series"
+const automatedNewCityMarker = "bitcoinwalk-new-city-automation-v1"
 
 // Legacy addresses remain readable. New writes use a distinct address for each
 // revision/decision; the storage guard below prevents address reuse.
@@ -102,6 +104,7 @@ type organizerPolicy struct {
 	admin                  nostr.PubKey
 	cityBrandAutomation    *nostr.PubKey
 	cityRevisionAutomation *nostr.PubKey
+	newCityAutomation      *nostr.PubKey
 	mu                     sync.Mutex
 	limits                 *chatLimits
 	replicaJournal         *replicaJournal
@@ -112,10 +115,21 @@ func (p *organizerPolicy) approvalAuthors() []nostr.PubKey {
 	if p.cityRevisionAutomation != nil {
 		authors = append(authors, *p.cityRevisionAutomation)
 	}
+	if p.newCityAutomation != nil {
+		authors = append(authors, *p.newCityAutomation)
+	}
 	return authors
 }
 func (p *organizerPolicy) isApprovalIssuer(key nostr.PubKey) bool {
-	return key == p.admin || p.cityRevisionAutomation != nil && key == *p.cityRevisionAutomation
+	return key == p.admin || p.cityRevisionAutomation != nil && key == *p.cityRevisionAutomation || p.newCityAutomation != nil && key == *p.newCityAutomation
+}
+
+func (p *organizerPolicy) authorizationAuthors() []nostr.PubKey {
+	authors := []nostr.PubKey{p.admin}
+	if p.newCityAutomation != nil {
+		authors = append(authors, *p.newCityAutomation)
+	}
+	return authors
 }
 
 func onlyAutomatedCityContentChanged(previous, next nostr.Event) bool {
@@ -289,7 +303,13 @@ func (p *organizerPolicy) byID(id string) *nostr.Event {
 	return nil
 }
 func (p *organizerPolicy) grant(cityID string) (*cityGrant, *nostr.Event, error) {
-	event := p.find(30302, &p.admin, cityID)
+	var event *nostr.Event
+	for candidate := range p.db.QueryEvents(nostr.Filter{Kinds: []nostr.Kind{30302}, Authors: p.authorizationAuthors(), Tags: nostr.TagMap{"d": []string{cityID}}}, 10001) {
+		if event == nil || candidate.CreatedAt > event.CreatedAt {
+			copy := candidate
+			event = &copy
+		}
+	}
 	if event == nil {
 		return nil, nil, nil
 	}
@@ -298,6 +318,107 @@ func (p *organizerPolicy) grant(cityID string) (*cityGrant, *nostr.Event, error)
 		return nil, nil, errors.New("restricted: invalid stored authorization; admin repair required")
 	}
 	return &grant, event, nil
+}
+
+func (p *organizerPolicy) checkAutomatedNewCityGrant(event nostr.Event, grant cityGrant) error {
+	if p.newCityAutomation == nil || event.PubKey != *p.newCityAutomation || grant.Version != 0 || grant.OwnerPubkey != "" || grant.OwnershipEventID != "" || len(grant.EditorPubkeys) != 1 || grant.EditorPubkeys[0] != grant.CreatorPubkey {
+		return errors.New("restricted: invalid automated new-city grant")
+	}
+	d, dErr := uniqueTag(event, "d")
+	if dErr != nil || d != grant.CityID || !uuidPattern.MatchString(grant.CityID) || grant.SuperAdminPubkey != p.admin.Hex() {
+		return errors.New("restricted: automated new-city grant fields")
+	}
+	if _, err := nostr.PubKeyFromHex(grant.CreatorPubkey); err != nil {
+		return errors.New("restricted: automated new-city creator")
+	}
+	var raw map[string]json.RawMessage
+	if json.Unmarshal([]byte(event.Content), &raw) != nil || len(raw) != 5 {
+		return errors.New("restricted: automated new-city grant content")
+	}
+	for _, field := range []string{"cityId", "creatorPubkey", "creatorRevisionId", "editorPubkeys", "superAdminPubkey"} {
+		if _, ok := raw[field]; !ok {
+			return errors.New("restricted: automated new-city grant content")
+		}
+	}
+	if len(event.Tags) != 3 {
+		return errors.New("restricted: automated new-city grant tags")
+	}
+	if client, err := uniqueTag(event, "client"); err != nil || client != "bitcoinwalk.org" {
+		return errors.New("restricted: automated new-city grant client")
+	}
+	if marker, err := uniqueTag(event, "automation"); err != nil || marker != automatedNewCityMarker {
+		return errors.New("restricted: automated new-city grant marker")
+	}
+	if existing, _, err := p.grant(grant.CityID); err != nil || existing != nil {
+		return errors.New("restricted: automated grant requires an unclaimed city")
+	}
+	original := p.byID(grant.CreatorRevisionID)
+	if original == nil || original.Kind != 30303 || original.PubKey.Hex() != grant.CreatorPubkey {
+		return errors.New("restricted: creator submission unavailable")
+	}
+	city, err := parseDraft(*original)
+	if err != nil || city.CityID != grant.CityID || city.RequestedTier != "free" {
+		return errors.New("restricted: automated grant requires an exact Basic city submission")
+	}
+	if p.revisionDecided(original.ID.Hex()) {
+		return errors.New("restricted: city submission already decided")
+	}
+	for decisionEvent := range p.db.QueryEvents(nostr.Filter{Kinds: []nostr.Kind{30304}, Authors: p.approvalAuthors()}, 10001) {
+		var decision cityDecision
+		if json.Unmarshal([]byte(decisionEvent.Content), &decision) != nil || decision.Status != "approved" || decision.CityID == city.CityID {
+			continue
+		}
+		revision := p.byID(decision.RevisionID)
+		if revision == nil {
+			continue
+		}
+		existing, e := parseDraft(*revision)
+		if e == nil && (strings.EqualFold(existing.Slug, city.Slug) || strings.EqualFold(strings.TrimSpace(existing.CityName), strings.TrimSpace(city.CityName))) {
+			return errors.New("restricted: matching city already exists")
+		}
+	}
+	return nil
+}
+
+func (p *organizerPolicy) checkAutomatedNewCityApproval(event nostr.Event, decision cityDecision, revision nostr.Event, city cityDraft) error {
+	if p.newCityAutomation == nil || event.PubKey != *p.newCityAutomation || decision.Status != "approved" || decision.Note != automatedNewCityNote || decision.Slug != "" || decision.HeroImageURL != "" || city.RequestedTier != "free" {
+		return errors.New("restricted: invalid automated new-city decision")
+	}
+	if p.revisionDecided(decision.RevisionID) {
+		return errors.New("restricted: city submission already decided")
+	}
+	if event.CreatedAt <= revision.CreatedAt {
+		return errors.New("restricted: automated new-city decision ordering")
+	}
+	grant, grantEvent, err := p.grant(decision.CityID)
+	if err != nil || grant == nil || grantEvent == nil || grantEvent.PubKey != event.PubKey || grant.CreatorPubkey != revision.PubKey.Hex() || grant.CreatorRevisionID != revision.ID.Hex() || len(grant.EditorPubkeys) != 1 || grant.EditorPubkeys[0] != revision.PubKey.Hex() {
+		return errors.New("restricted: exact automated owner grant required")
+	}
+	revisionInitials := []string{}
+	for _, tag := range revision.Tags {
+		if len(tag) == 4 && tag[0] == "e" && tag[2] == "" && tag[3] == "initial-walk" {
+			revisionInitials = append(revisionInitials, tag[1])
+		}
+	}
+	if len(revisionInitials) == 0 || !slices.Equal(decisionInitialIDs(decision), revisionInitials) {
+		return errors.New("restricted: automated approval must release every submitted first walk")
+	}
+	for _, id := range revisionInitials {
+		proposal := p.byID(id)
+		if proposal == nil || proposal.Kind != 31923 || proposal.PubKey != revision.PubKey {
+			return errors.New("invalid: submitted initial walk unavailable")
+		}
+		if err := p.validateInitialProposal(*proposal, &city, true); err != nil {
+			return err
+		}
+	}
+	if status := p.moderationStatus(decision.CityID, "city:"+decision.CityID); status != "" && status != "active" {
+		return errors.New("restricted: suspended city requires manual review")
+	}
+	if status := p.organizerModerationStatus(revision.PubKey.Hex()); status != "" && status != "active" {
+		return errors.New("restricted: suspended organizer requires manual review")
+	}
+	return nil
 }
 func (p *organizerPolicy) canEdit(key nostr.PubKey, grant *cityGrant) bool {
 	return key == p.admin || grant != nil && slices.Contains(grant.EditorPubkeys, key.Hex())
@@ -510,12 +631,15 @@ func (p *organizerPolicy) check(ctx context.Context, event nostr.Event) error {
 		}
 		return nil
 	case 30302:
-		if event.PubKey != p.admin {
+		if event.PubKey != p.admin && (p.newCityAutomation == nil || event.PubKey != *p.newCityAutomation) {
 			return errors.New("restricted: only the super-admin can change city editors")
 		}
 		var grant cityGrant
 		if json.Unmarshal([]byte(event.Content), &grant) != nil {
 			return errors.New("invalid: authorization JSON required")
+		}
+		if event.PubKey != p.admin {
+			return p.checkAutomatedNewCityGrant(event, grant)
 		}
 		d, err := uniqueTag(event, "d")
 		if err != nil || !uuidPattern.MatchString(grant.CityID) || d != grant.CityID || grant.SuperAdminPubkey != p.admin.Hex() || len(grant.EditorPubkeys) == 0 || len(grant.EditorPubkeys) > 100 {
@@ -643,6 +767,9 @@ func (p *organizerPolicy) check(ctx context.Context, event nostr.Event) error {
 		}
 		if status == "approved" {
 			if event.PubKey != p.admin {
+				if p.newCityAutomation != nil && event.PubKey == *p.newCityAutomation {
+					return p.checkAutomatedNewCityApproval(event, decision, *revision, city)
+				}
 				return p.checkAutomatedCityRevision(event, decision, *revision)
 			}
 			revisionInitials := []string{}
