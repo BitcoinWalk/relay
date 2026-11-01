@@ -77,6 +77,29 @@ func TestCityBrandAdmissionRejectsMalformedStaleAndUnauthorizedRecords(t *testin
 	deny(t, relay, malformed)
 }
 
+func TestCityBrandAutomationCanOnlyCreateInitialBinding(t *testing.T) {
+	admin, automation, creator := nostr.Generate(), nostr.Generate(), nostr.Generate()
+	adminPK, automationPK := nostr.GetPublicKey(admin), nostr.GetPublicKey(automation)
+	relay, db, err := newRelay(filepath.Join(t.TempDir(), "events.db"), map[nostr.PubKey]bool{adminPK: true, automationPK: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { relay.DisableExpirationManager(); db.Close() }()
+	p := enableOrganizers(relay, db, adminPK)
+	p.cityBrandAutomation = &automationPK
+	proposal := draftEvent(t, creator, cityA, 10)
+	accept(t, relay, proposal)
+	grant := cityGrant{CityID: cityA, CreatorPubkey: nostr.GetPublicKey(creator).Hex(), CreatorRevisionID: proposal.ID.Hex(), EditorPubkeys: []string{nostr.GetPublicKey(creator).Hex()}, SuperAdminPubkey: adminPK.Hex()}
+	accept(t, relay, workflowEvent(t, admin, 30302, grant, nostr.Tags{{"d", cityA}}, 11))
+	decision := cityDecision{CityID: cityA, RevisionID: proposal.ID.Hex(), Status: "approved"}
+	accept(t, relay, workflowEvent(t, admin, 30304, decision, nostr.Tags{{"d", cityA}, {"e", proposal.ID.Hex(), "", "city-revision"}, {"status", "approved"}}, 12))
+	brand := nostr.GetPublicKey(nostr.Generate()).Hex()
+	first := cityBrandEvent(t, automation, cityA, 0, "", "activate", brand, 20)
+	accept(t, relay, first)
+	deny(t, relay, cityBrandEvent(t, automation, cityA, 1, first.ID.Hex(), "replace", nostr.GetPublicKey(nostr.Generate()).Hex(), 21))
+	deny(t, relay, cityBrandEvent(t, automation, cityA, 1, first.ID.Hex(), "revoke", brand, 22))
+}
+
 func TestCityBrandRevocationSurvivesLostEligibility(t *testing.T) {
 	relay, closeRelay, admin, _ := approvedCityBrandRelay(t)
 	defer closeRelay()

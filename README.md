@@ -23,8 +23,14 @@ with SHA-256 manifests.
 ### Official city identity bindings
 
 Organizer mode admits BitcoinWalk-specific kind `30312` records only through the
-city identity policy. The event must be signed by the configured super-admin and
-use the exact canonical JSON and ordered tags defined by the web contract. The
+city identity policy. The event must use the exact canonical JSON and ordered
+tags defined by the web contract. Ordinarily it is signed by the configured
+super-admin. An optional `RELAY_CITY_BRAND_AUTOMATION_PUBKEY` may sign only an
+initial `activate` record at sequence zero with no predecessor. That key must be
+dedicated, differ from the super-admin and also appear in `RELAY_WRITERS` so
+NIP-42 authentication and the ordinary writer allowlist still apply. Removing
+the setting revokes this authority on restart; the key cannot replace or revoke
+a binding. The
 relay retains every sequence address, requires an existing city and current city
 approval for activation or replacement, rejects suspended cities, stale
 predecessors, forks and same-key replacement, and keeps exact retries

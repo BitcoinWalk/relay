@@ -96,11 +96,12 @@ func decisionInitialIDs(decision cityDecision) []string {
 }
 
 type organizerPolicy struct {
-	db             *boltdb.BoltBackend
-	admin          nostr.PubKey
-	mu             sync.Mutex
-	limits         *chatLimits
-	replicaJournal *replicaJournal
+	db                  *boltdb.BoltBackend
+	admin               nostr.PubKey
+	cityBrandAutomation *nostr.PubKey
+	mu                  sync.Mutex
+	limits              *chatLimits
+	replicaJournal      *replicaJournal
 	// Set only for an isolated, signed replica-bundle validation snapshot.
 	retainedReplicaValidation bool
 }
