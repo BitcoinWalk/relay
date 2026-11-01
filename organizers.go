@@ -88,11 +88,12 @@ func decisionInitialIDs(decision cityDecision) []string {
 }
 
 type organizerPolicy struct {
-	db             *boltdb.BoltBackend
-	admin          nostr.PubKey
-	mu             sync.Mutex
-	limits         *chatLimits
-	replicaJournal *replicaJournal
+	db                  *boltdb.BoltBackend
+	admin               nostr.PubKey
+	cityBrandAutomation *nostr.PubKey
+	mu                  sync.Mutex
+	limits              *chatLimits
+	replicaJournal      *replicaJournal
 }
 
 func uniqueTag(event nostr.Event, name string) (string, error) {

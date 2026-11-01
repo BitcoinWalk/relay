@@ -295,6 +295,17 @@ func run() error {
 	var deliveryTransport replicaTransport
 	if env("RELAY_ORGANIZER_MODE", "false") == "true" {
 		organizer = enableOrganizers(relay, db, nostr.MustPubKeyFromHex(adminHex))
+		if automationHex := os.Getenv("RELAY_CITY_BRAND_AUTOMATION_PUBKEY"); automationHex != "" {
+			automation, err := nostr.PubKeyFromHex(automationHex)
+			if err != nil || automation == organizer.admin {
+				return errors.New("invalid city identity automation public key")
+			}
+			if !writers[automation] {
+				return errors.New("city identity automation key must be an authenticated relay writer")
+			}
+			organizer.cityBrandAutomation = &automation
+			log.Printf("City identity automation admits initial bindings from dedicated key %s", automation.Hex())
+		}
 		log.Print("Organizer mode enabled; city approvals and editor lists require the super-admin")
 		journalPath := os.Getenv("RELAY_REPLICA_JOURNAL")
 		registryPath := os.Getenv("RELAY_REPLICA_REGISTRY")

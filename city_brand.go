@@ -45,7 +45,11 @@ func parseCityBrand(event nostr.Event) (cityBrandBinding, error) {
 
 func (p *organizerPolicy) cityBrandHistory(cityID string) ([]nostr.Event, error) {
 	var events []nostr.Event
-	for event := range p.db.QueryEvents(nostr.Filter{Kinds: []nostr.Kind{cityBrandKind}, Authors: []nostr.PubKey{p.admin}, Tags: nostr.TagMap{"i": []string{cityID}}}, 10001) {
+	authors := []nostr.PubKey{p.admin}
+	if p.cityBrandAutomation != nil {
+		authors = append(authors, *p.cityBrandAutomation)
+	}
+	for event := range p.db.QueryEvents(nostr.Filter{Kinds: []nostr.Kind{cityBrandKind}, Authors: authors, Tags: nostr.TagMap{"i": []string{cityID}}}, 10001) {
 		events = append(events, event)
 		if len(events) > 10000 {
 			return nil, errors.New("restricted: city identity history exceeds the safety limit")
@@ -92,7 +96,8 @@ func validateCityBrandSuccessor(binding cityBrandBinding, previous *nostr.Event)
 }
 
 func (p *organizerPolicy) checkCityBrand(event nostr.Event) error {
-	if event.PubKey != p.admin {
+	automated := p.cityBrandAutomation != nil && event.PubKey == *p.cityBrandAutomation
+	if event.PubKey != p.admin && !automated {
 		return errors.New("restricted: only the super-admin can attest an official city identity")
 	}
 	binding, err := parseCityBrand(event)
@@ -101,6 +106,9 @@ func (p *organizerPolicy) checkCityBrand(event nostr.Event) error {
 	}
 	if p.byID(event.ID.Hex()) != nil {
 		return nil
+	}
+	if automated && (binding.Action != "activate" || binding.Sequence != 0 || binding.Previous != "") {
+		return errors.New("restricted: city identity automation can only create an initial binding")
 	}
 	grant, _, err := p.grant(binding.CityID)
 	if err != nil || grant == nil {
