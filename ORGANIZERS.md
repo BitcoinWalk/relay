@@ -9,8 +9,9 @@ This mode must be explicitly enabled using RELAY_ORGANIZER_MODE=true. It replace
 - Authorization content extends the app's current unused schema with creatorPubkey and creatorRevisionId. Existing fields remain cityId, editorPubkeys and superAdminPubkey. The d tag must equal cityId. The editor list must retain the creator, contain 1–100 valid public keys, and every update must be newer than the stored authorization. Creator changes are not implemented.
 - Removed editors lose write access immediately; checks are repeated under a shared lock at the storage boundary. Authorizations persist in the event database across restarts. Expiration and deletion of workflow events are blocked.
 - Kind 30304 approvals/rejections/revocations require the super-admin. City ID, revision ID and tags must match. Approval requires the revision author to be on the city list (or the admin). Existing decisions can be revoked even if their replaceable revision is no longer retained.
+- Kind 30314 lets only the current city owner request an editor addition or removal against the exact current authorization. It never changes access by itself; the super-admin must still publish the resulting kind-30302 authorization.
 - Reads remain public; **pending proposals are public too**. Never put private details in a city description or meeting information.
-- Only kinds 30302, 30303 and 30304 are enabled in organizer mode. Calendar/profile publication, deletion and the old expiring admin diagnostic are deliberately disabled until bound to approved revisions. Other relays and the production site are unaffected.
+- Only kinds 30302, 30303, 30304 and 30314 are enabled in this organizer workflow. Calendar/profile publication, deletion and the old expiring admin diagnostic are deliberately disabled until bound to approved revisions. Other relays and the production site are unaffected.
 
 ## Boundaries and remaining work
 
