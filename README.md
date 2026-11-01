@@ -40,6 +40,19 @@ city-signer proof events are not admitted. A creator may remain the public city
 identity when the reviewed owner and city-signer proofs authorize that choice;
 the super-admin identity itself can never be assigned as a city identity.
 
+### Content-only city revisions
+
+An optional `RELAY_CITY_REVISION_AUTOMATION_PUBKEY` may sign only a marked
+approval for a direct revision of an already approved city. The key must be a
+dedicated authenticated writer. The relay independently requires the revision
+author to remain a current editor, one exact predecessor matching the current
+approved revision, no later manual decision, no city or organizer suspension,
+and changes limited to `startAt`, `description` and `meetingPoint`. The automated
+decision cannot set a slug, image, aliases, first walk or any rejection or
+revocation. Removing the setting disables new automated decisions on restart.
+Occurrence replication carries the predecessor approval and revision so the
+destination repeats the same validation instead of trusting the source alone.
+
 ## Build and test
 
 The module targets Go 1.25. Dependencies are locked in `go.mod` and `go.sum`.

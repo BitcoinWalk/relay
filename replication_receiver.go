@@ -101,7 +101,7 @@ func decodeReplicaBundle(data []byte) (*replicaBundle, error) {
 	return &bundle, nil
 }
 
-func validateReplicaEnvelope(ctx context.Context, envelope replicaDeliveryEnvelope, scope replicaScope, admin nostr.PubKey) (*replicaBundle, error) {
+func validateReplicaEnvelope(ctx context.Context, envelope replicaDeliveryEnvelope, scope replicaScope, admin nostr.PubKey, revisionAutomation ...nostr.PubKey) (*replicaBundle, error) {
 	if envelope.Version != replicaEnvelopeVersion || envelope.CityID != scope.CityID || envelope.Destination != scope.Destination || envelope.SourceSequence == 0 {
 		return nil, errors.New("restricted: replica delivery scope or checkpoint mismatch")
 	}
@@ -143,7 +143,7 @@ func validateReplicaEnvelope(ctx context.Context, envelope replicaDeliveryEnvelo
 	if action != "occurrence" || envelope.OccurrenceID == "" || envelope.OccurrenceID != envelope.Event.ID.Hex() {
 		return nil, errors.New("invalid: replica delivery action or occurrence")
 	}
-	if err := validateReplicaBundle(ctx, envelope.Bundle, scope, admin); err != nil {
+	if err := validateReplicaBundle(ctx, envelope.Bundle, scope, admin, revisionAutomation...); err != nil {
 		return nil, err
 	}
 	bundle, err := decodeReplicaBundle(envelope.Bundle)
@@ -384,7 +384,11 @@ func (r *replicaReceiver) receiveReplicaEnvelope(ctx context.Context, envelope r
 	if !khatru.IsAuthed(ctx, r.scope.ServiceKey) {
 		return replicaDeliveryAck{}, errors.New("auth-required: authenticate as configured replication service")
 	}
-	bundle, err := validateReplicaEnvelope(ctx, envelope, r.scope, r.policy.admin)
+	automation := []nostr.PubKey{}
+	if r.policy.cityRevisionAutomation != nil {
+		automation = append(automation, *r.policy.cityRevisionAutomation)
+	}
+	bundle, err := validateReplicaEnvelope(ctx, envelope, r.scope, r.policy.admin, automation...)
 	if err != nil {
 		return replicaDeliveryAck{}, err
 	}

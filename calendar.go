@@ -103,7 +103,7 @@ func (p *organizerPolicy) currentApproval(cityID string) *nostr.Event {
 	if old := p.find(30304, &p.admin, cityID); old != nil {
 		records[old.ID] = *old
 	}
-	for e := range p.db.QueryEvents(nostr.Filter{Kinds: []nostr.Kind{30304}, Authors: []nostr.PubKey{p.admin}, Tags: nostr.TagMap{"i": []string{cityID}}}, 10001) {
+	for e := range p.db.QueryEvents(nostr.Filter{Kinds: []nostr.Kind{30304}, Authors: p.approvalAuthors(), Tags: nostr.TagMap{"i": []string{cityID}}}, 10001) {
 		records[e.ID] = e
 		if len(records) > 10000 {
 			return nil
@@ -523,7 +523,7 @@ func (p *organizerPolicy) checkOrganizerCalendar(event nostr.Event, writing bool
 	}
 	revision := p.byID(revisionID)
 	approval := p.byID(approvalID)
-	if revision == nil || revision.Kind != 30303 || approval == nil || approval.Kind != 30304 || approval.PubKey != p.admin {
+	if revision == nil || revision.Kind != 30303 || approval == nil || approval.Kind != 30304 || !p.isApprovalIssuer(approval.PubKey) {
 		return errors.New("invalid: approved occurrence source unavailable")
 	}
 	city, err := parseDraft(*revision)

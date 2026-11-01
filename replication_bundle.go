@@ -35,7 +35,7 @@ const maxReplicaBundleEvents = 13
 // NOT install records in a live relay and cannot establish current source state.
 // A receiver must also check authenticated source ordering and existing
 // destination tombstones/revocations before making the occurrence visible.
-func validateReplicaBundle(ctx context.Context, data []byte, scope replicaScope, admin nostr.PubKey) error {
+func validateReplicaBundle(ctx context.Context, data []byte, scope replicaScope, admin nostr.PubKey, revisionAutomation ...nostr.PubKey) error {
 	if len(data) > 256*1024 {
 		return errors.New("restricted: replica bundle too large")
 	}
@@ -55,6 +55,9 @@ func validateReplicaBundle(ctx context.Context, data []byte, scope replicaScope,
 		return errors.New("invalid: bundle envelope")
 	}
 	seen := map[string]bool{}
+	isApprovalIssuer := func(key nostr.PubKey) bool {
+		return key == admin || len(revisionAutomation) == 1 && key == revisionAutomation[0]
+	}
 	for _, event := range bundle.Events {
 		if seen[event.ID.Hex()] || !event.CheckID() || !event.VerifySignature() {
 			return errors.New("invalid: duplicate or corrupt bundle event")
@@ -73,7 +76,7 @@ func validateReplicaBundle(ctx context.Context, data []byte, scope replicaScope,
 			}
 		case 30304:
 			var decision cityDecision
-			if event.PubKey != admin || json.Unmarshal([]byte(event.Content), &decision) != nil || decision.CityID != scope.CityID || decision.Status != "approved" {
+			if !isApprovalIssuer(event.PubKey) || json.Unmarshal([]byte(event.Content), &decision) != nil || decision.CityID != scope.CityID || decision.Status != "approved" {
 				return errors.New("invalid: bundle approval")
 			}
 		case 31923:
@@ -96,6 +99,9 @@ func validateReplicaBundle(ctx context.Context, data []byte, scope replicaScope,
 	}
 	defer db.Close()
 	policy := &organizerPolicy{db: db, admin: admin}
+	if len(revisionAutomation) == 1 {
+		policy.cityRevisionAutomation = &revisionAutomation[0]
+	}
 	// Revisions are schema/signature-checked provenance, not new proposals. Their
 	// authorization is established by the admin-signed grant and approval below.
 	for _, event := range bundle.Events {
@@ -155,6 +161,24 @@ func validateReplicaBundle(ctx context.Context, data []byte, scope replicaScope,
 		return errors.New("invalid: decision")
 	}
 	required := map[string]bool{grant.CreatorRevisionID: true, decision.RevisionID: true, approval.ID.Hex(): true, bundle.OccurrenceID: true}
+	if approval.PubKey != admin {
+		revision := policy.byID(decision.RevisionID)
+		if revision == nil {
+			return errors.New("invalid: automated revision unavailable")
+		}
+		previousID := ""
+		for _, tag := range revision.Tags {
+			if len(tag) == 4 && tag[0] == "e" && tag[2] == "" && tag[3] == "previous" {
+				previousID = tag[1]
+			}
+		}
+		prior := policy.approvedDecisionForRevision(scope.CityID, previousID)
+		if prior == nil {
+			return errors.New("invalid: automated revision predecessor unavailable")
+		}
+		required[previousID] = true
+		required[prior.ID.Hex()] = true
+	}
 	_, grantEvent, _ := policy.grant(scope.CityID)
 	required[grantEvent.ID.Hex()] = true
 	for _, id := range decisionInitialIDs(decision) {
@@ -218,7 +242,25 @@ func (p *organizerPolicy) exportReplicaBundleLocked(cityID, occurrenceID string)
 		}
 		return nil
 	}
-	for _, event := range []*nostr.Event{p.byID(grant.CreatorRevisionID), grantEvent, p.byID(decision.RevisionID)} {
+	currentRevision := p.byID(decision.RevisionID)
+	if approval.PubKey != p.admin {
+		if currentRevision == nil {
+			return nil, errors.New("invalid: automated revision unavailable")
+		}
+		previousID := ""
+		for _, tag := range currentRevision.Tags {
+			if len(tag) == 4 && tag[0] == "e" && tag[2] == "" && tag[3] == "previous" {
+				previousID = tag[1]
+			}
+		}
+		prior := p.approvedDecisionForRevision(cityID, previousID)
+		for _, event := range []*nostr.Event{p.byID(previousID), prior} {
+			if err := add(event); err != nil {
+				return nil, err
+			}
+		}
+	}
+	for _, event := range []*nostr.Event{p.byID(grant.CreatorRevisionID), grantEvent, currentRevision} {
 		if err := add(event); err != nil {
 			return nil, err
 		}

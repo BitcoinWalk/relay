@@ -22,6 +22,8 @@ import (
 var uuidPattern = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
 var slugPattern = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
 
+const automatedCityRevisionNote = "AUTOMATED_CITY_REVISION: approved content-only editor revision"
+
 // Legacy addresses remain readable. New writes use a distinct address for each
 // revision/decision; the storage guard below prevents address reuse.
 func workflowAddress(d, cityID string) bool {
@@ -88,12 +90,120 @@ func decisionInitialIDs(decision cityDecision) []string {
 }
 
 type organizerPolicy struct {
-	db                  *boltdb.BoltBackend
-	admin               nostr.PubKey
-	cityBrandAutomation *nostr.PubKey
-	mu                  sync.Mutex
-	limits              *chatLimits
-	replicaJournal      *replicaJournal
+	db                     *boltdb.BoltBackend
+	admin                  nostr.PubKey
+	cityBrandAutomation    *nostr.PubKey
+	cityRevisionAutomation *nostr.PubKey
+	mu                     sync.Mutex
+	limits                 *chatLimits
+	replicaJournal         *replicaJournal
+}
+
+func (p *organizerPolicy) approvalAuthors() []nostr.PubKey {
+	authors := []nostr.PubKey{p.admin}
+	if p.cityRevisionAutomation != nil {
+		authors = append(authors, *p.cityRevisionAutomation)
+	}
+	return authors
+}
+func (p *organizerPolicy) isApprovalIssuer(key nostr.PubKey) bool {
+	return key == p.admin || p.cityRevisionAutomation != nil && key == *p.cityRevisionAutomation
+}
+
+func onlyAutomatedCityContentChanged(previous, next nostr.Event) bool {
+	var before, after map[string]json.RawMessage
+	if json.Unmarshal([]byte(previous.Content), &before) != nil || json.Unmarshal([]byte(next.Content), &after) != nil {
+		return false
+	}
+	changed := false
+	for _, field := range []string{"startAt", "description", "meetingPoint"} {
+		if !slices.Equal(before[field], after[field]) {
+			changed = true
+		}
+		delete(before, field)
+		delete(after, field)
+	}
+	left, _ := json.Marshal(before)
+	right, _ := json.Marshal(after)
+	return changed && slices.Equal(left, right)
+}
+
+func (p *organizerPolicy) checkAutomatedCityRevision(event nostr.Event, decision cityDecision, revision nostr.Event) error {
+	if p.cityRevisionAutomation == nil || event.PubKey != *p.cityRevisionAutomation || decision.Status != "approved" || decision.Note != automatedCityRevisionNote || decision.Slug != "" || decision.HeroImageURL != "" || len(decisionInitialIDs(decision)) != 0 {
+		return errors.New("restricted: invalid automated city revision decision")
+	}
+	if stored := p.byID(event.ID.Hex()); stored != nil && stored.ID == event.ID {
+		return nil
+	}
+	if p.revisionDecided(decision.RevisionID) {
+		return errors.New("restricted: revision already has a manual or automated decision")
+	}
+	var raw map[string]json.RawMessage
+	if json.Unmarshal([]byte(event.Content), &raw) != nil || len(raw) != 4 {
+		return errors.New("restricted: automated decision contains privileged fields")
+	}
+	for _, field := range []string{"cityId", "cityRevisionId", "status", "note"} {
+		if _, ok := raw[field]; !ok {
+			return errors.New("restricted: automated decision fields")
+		}
+	}
+	if len(event.Tags) != 5 {
+		return errors.New("restricted: automated decision tags")
+	}
+	counts := map[string]int{}
+	for _, tag := range event.Tags {
+		counts[tag[0]]++
+		if !slices.Contains([]string{"d", "i", "e", "status", "client"}, tag[0]) {
+			return errors.New("restricted: automated decision tags")
+		}
+	}
+	if counts["d"] != 1 || counts["i"] != 1 || counts["e"] != 1 || counts["status"] != 1 || counts["client"] != 1 {
+		return errors.New("restricted: automated decision tags")
+	}
+	if client, err := uniqueTag(event, "client"); err != nil || client != "bitcoinwalk.org" {
+		return errors.New("restricted: automated decision client")
+	}
+	previous := p.currentApproval(decision.CityID)
+	if previous == nil || previous.ID == event.ID {
+		return errors.New("restricted: automated revision requires an existing current approval")
+	}
+	if head := p.latestDecision(decision.CityID); head == nil || head.ID != previous.ID {
+		return errors.New("restricted: later moderation requires manual review")
+	}
+	var prior cityDecision
+	if json.Unmarshal([]byte(previous.Content), &prior) != nil || prior.Status != "approved" {
+		return errors.New("restricted: current city approval is unavailable")
+	}
+	predecessors := 0
+	for _, tag := range revision.Tags {
+		if len(tag) == 4 && tag[0] == "e" && tag[2] == "" && tag[3] == "previous" {
+			predecessors++
+			if tag[1] != prior.RevisionID {
+				return errors.New("restricted: automated revision is stale")
+			}
+		}
+		if len(tag) > 3 && tag[0] == "e" && tag[3] == "initial-walk" {
+			return errors.New("restricted: automated revisions cannot release first walks")
+		}
+	}
+	if predecessors != 1 || event.CreatedAt <= previous.CreatedAt || event.CreatedAt <= revision.CreatedAt {
+		return errors.New("restricted: automated revision ordering or predecessor")
+	}
+	oldRevision := p.byID(prior.RevisionID)
+	if oldRevision == nil || !onlyAutomatedCityContentChanged(*oldRevision, revision) {
+		return errors.New("restricted: automated revision changes protected city fields")
+	}
+	grant, _, err := p.grant(decision.CityID)
+	if err != nil || grant == nil || !p.canEdit(revision.PubKey, grant) {
+		return errors.New("restricted: automated revision author is not a current editor")
+	}
+	if status := p.moderationStatus(decision.CityID, "city:"+decision.CityID); status != "" && status != "active" {
+		return errors.New("restricted: suspended city requires manual review")
+	}
+	if status := p.organizerModerationStatus(revision.PubKey.Hex()); status != "" && status != "active" {
+		return errors.New("restricted: suspended organizer requires manual review")
+	}
+	return nil
 }
 
 func uniqueTag(event nostr.Event, name string) (string, error) {
@@ -187,7 +297,7 @@ func (p *organizerPolicy) canEdit(key nostr.PubKey, grant *cityGrant) bool {
 
 func (p *organizerPolicy) latestDecision(cityID string) *nostr.Event {
 	latest := p.find(30304, &p.admin, cityID) // pre-upgrade decision
-	for event := range p.db.QueryEvents(nostr.Filter{Kinds: []nostr.Kind{30304}, Authors: []nostr.PubKey{p.admin}, Tags: nostr.TagMap{"i": []string{cityID}}}, 1) {
+	for event := range p.db.QueryEvents(nostr.Filter{Kinds: []nostr.Kind{30304}, Authors: p.approvalAuthors(), Tags: nostr.TagMap{"i": []string{cityID}}}, 10001) {
 		if latest == nil || event.CreatedAt > latest.CreatedAt {
 			latest = &event
 		}
@@ -196,13 +306,25 @@ func (p *organizerPolicy) latestDecision(cityID string) *nostr.Event {
 }
 
 func (p *organizerPolicy) revisionDecided(id string) bool {
-	for event := range p.db.QueryEvents(nostr.Filter{Kinds: []nostr.Kind{30304}, Authors: []nostr.PubKey{p.admin}}, 10001) {
+	for event := range p.db.QueryEvents(nostr.Filter{Kinds: []nostr.Kind{30304}, Authors: p.approvalAuthors()}, 10001) {
 		var decision cityDecision
 		if json.Unmarshal([]byte(event.Content), &decision) == nil && decision.RevisionID == id {
 			return true
 		}
 	}
 	return false
+}
+
+func (p *organizerPolicy) approvedDecisionForRevision(cityID, revisionID string) *nostr.Event {
+	var latest *nostr.Event
+	for event := range p.db.QueryEvents(nostr.Filter{Kinds: []nostr.Kind{30304}, Authors: p.approvalAuthors()}, 10001) {
+		var decision cityDecision
+		if json.Unmarshal([]byte(event.Content), &decision) == nil && decision.CityID == cityID && decision.RevisionID == revisionID && decision.Status == "approved" && (latest == nil || event.CreatedAt > latest.CreatedAt) {
+			copy := event
+			latest = &copy
+		}
+	}
+	return latest
 }
 
 // Only an exact retained release permits restoring a past initial walk.
@@ -399,7 +521,7 @@ func (p *organizerPolicy) check(ctx context.Context, event nostr.Event) error {
 		}
 		return nil
 	case 30304:
-		if event.PubKey != p.admin {
+		if !p.isApprovalIssuer(event.PubKey) {
 			return errors.New("restricted: only the super-admin can approve or revoke walks")
 		}
 		var decision cityDecision
@@ -467,6 +589,9 @@ func (p *organizerPolicy) check(ctx context.Context, event nostr.Event) error {
 			return errors.New("invalid: approval city does not match revision")
 		}
 		if status == "approved" {
+			if event.PubKey != p.admin {
+				return p.checkAutomatedCityRevision(event, decision, *revision)
+			}
 			revisionInitials := []string{}
 			for _, tag := range revision.Tags {
 				if len(tag) == 4 && tag[0] == "e" && tag[2] == "" && tag[3] == "initial-walk" {
