@@ -33,7 +33,10 @@ func TestInitialWalkLimitIgnoresAuthenticationAndExactRetransmission(t *testing.
 	}
 	defer db.Close()
 	defer relay.DisableExpirationManager()
-	enableOrganizers(relay, db, nostr.GetPublicKey(admin))
+	policy := enableOrganizers(relay, db, nostr.GetPublicKey(admin))
+	// Exercise the organizer limiter without the transport limiter's shared
+	// empty-IP bucket; this is a direct policy test, not a WebSocket test.
+	relay.OnEvent = organizerEventPolicy(policy)
 
 	proposal := initialWalkForLimitTest(t, creator, 0)
 	for range 4 {

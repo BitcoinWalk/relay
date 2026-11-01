@@ -504,9 +504,8 @@ func (p *organizerPolicy) check(ctx context.Context, event nostr.Event) error {
 	}
 }
 
-func enableOrganizers(relay *khatru.Relay, db *boltdb.BoltBackend, admin nostr.PubKey) *organizerPolicy {
-	p := &organizerPolicy{db: db, admin: admin, limits: &chatLimits{}}
-	relay.OnEvent = policies.SeqEvent(func(ctx context.Context, event nostr.Event) (bool, string) {
+func organizerEventPolicy(p *organizerPolicy) func(context.Context, nostr.Event) (bool, string) {
+	return func(ctx context.Context, event nostr.Event) (bool, string) {
 		p.mu.Lock()
 		defer p.mu.Unlock()
 		if err := p.check(ctx, event); err != nil {
@@ -531,7 +530,12 @@ func enableOrganizers(relay *khatru.Relay, db *boltdb.BoltBackend, admin nostr.P
 			}
 		}
 		return false, ""
-	}, policies.EventRejectionStrictDefaults)
+	}
+}
+
+func enableOrganizers(relay *khatru.Relay, db *boltdb.BoltBackend, admin nostr.PubKey) *organizerPolicy {
+	p := &organizerPolicy{db: db, admin: admin, limits: &chatLimits{}}
+	relay.OnEvent = policies.SeqEvent(organizerEventPolicy(p), policies.EventRejectionStrictDefaults)
 	// Check again under a lock covering the actual write: a revoked editor cannot
 	// pass a pre-check and then race an admin authorization update into storage.
 	wrap := func(save func(context.Context, nostr.Event) error) func(context.Context, nostr.Event) error {
