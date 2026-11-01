@@ -48,6 +48,9 @@ func TestAutomatedNewCityRequiresExactBasicSubmissionAndWalks(t *testing.T) {
 	if policy.currentApproval(cityA).ID != approval.ID {
 		t.Fatal("automated new city approval did not become current")
 	}
+	if err := policy.checkCalendarRead(walk); err != nil {
+		t.Fatalf("automated new city approval did not release its initial walk: %v", err)
+	}
 	broadened := grant
 	broadened.EditorPubkeys = append(broadened.EditorPubkeys, adminPK.Hex())
 	deny(t, relay, workflowEvent(t, automation, 30302, broadened, nostr.Tags{{"d", cityB}, {"client", "bitcoinwalk.org"}, {"automation", automatedNewCityMarker}}, 4))

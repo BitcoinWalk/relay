@@ -179,7 +179,7 @@ func (p *organizerPolicy) checkCalendarRead(event nostr.Event) error {
 		}
 		var revision *nostr.Event
 		seen := 0
-		for approval := range p.db.QueryEvents(nostr.Filter{Kinds: []nostr.Kind{30304}, Authors: []nostr.PubKey{p.admin}}, 10001) {
+		for approval := range p.db.QueryEvents(nostr.Filter{Kinds: []nostr.Kind{30304}, Authors: p.approvalAuthors()}, 10001) {
 			seen++
 			if seen > 10000 {
 				return errors.New("restricted: city approval history exceeds the safe read limit")
