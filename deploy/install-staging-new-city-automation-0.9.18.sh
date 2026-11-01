@@ -10,7 +10,7 @@ binary=/opt/bitcoinwalk-relay/bitcoinwalk-relay
 database=/var/lib/bitcoinwalk-relay/events.db
 old_dropin=/etc/systemd/system/bitcoinwalk-relay.service.d/98-editor-requests-0.9.17.conf
 version_dropin=/etc/systemd/system/bitcoinwalk-relay.service.d/98-new-city-automation-0.9.18.conf
-expected_current_hash=9c0f0683f5592a056e053bbe150c4d2b6f6b31b54cef3d0b8119a7db1c8b3198
+expected_current_hash=4981fce2beee00fc1a3bd71888695e690307e2fcd093f49dca319e377230eafb
 expected_current_version=bitcoinwalk-organizers-0.9.17
 expected_version=bitcoinwalk-organizers-0.9.18
 wait_health(){ local ready=false; for _ in $(seq 1 30);do if curl -fsS --max-time 3 http://127.0.0.1:3334/healthz >/dev/null;then ready=true;break;fi;sleep 1;done;"$ready"; }
@@ -18,7 +18,7 @@ logical_digest(){ RELAY_REPLICA_DB_DIGEST="$1" "$artifact"; }
 sha256sum -c SHA256SUMS
 for file in "$artifact" "$version_template" "$binary" "$database" "$old_dropin";do test -f "$file"&&test ! -L "$file";done
 test -x "$artifact";test -x "$binary";test ! -e "$version_dropin"
-test "$(sha256sum "$binary"|cut -d' ' -f1)" = "$expected_current_hash"
+test "$(sha256sum "$binary"|cut -d' ' -f1)" = "$expected_current_hash" || { echo 'Unexpected installed staging relay binary.' >&2;exit 1; }
 for unit in "$service" bitcoinwalk-relay-production.service bitcoinwalk-guide.service;do systemctl is-active --quiet "$unit";done
 curl -fsS --max-time 5 -H 'Accept: application/nostr+json' http://127.0.0.1:3334/|grep -q "$expected_current_version"
 if grep -Rqs 'RELAY_NEW_CITY_AUTOMATION_PUBKEY' /etc/systemd/system/bitcoinwalk-relay.service.d;then echo 'Refusing update: new-city automation is unexpectedly enabled.' >&2;exit 1;fi
