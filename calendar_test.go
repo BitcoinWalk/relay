@@ -210,6 +210,32 @@ func TestOrganizerOccurrencePublishingAndModeration(t *testing.T) {
 	}
 	unauthorized := occurrence(stranger, 3)
 	deny(t, relay, unauthorized)
+	customRoute := "https://www.alltrails.com/explore/custom-routes/custom-route-camacha-levada-dos-tornos-48092f7?u=m&sh=vmjvek"
+	withRoute := occurrence(editor, 3)
+	withRoute.Tags = append(withRoute.Tags, nostr.Tag{"bitcoinwalk-route", "alltrails-v1"}, nostr.Tag{"r", customRoute})
+	withRoute.Sign(editor)
+	if err := policy.checkOrganizerCalendar(withRoute, true); err != nil {
+		t.Fatalf("custom-route occurrence rejected: %v", err)
+	}
+	for _, route := range []string{
+		"https://www.alltrails.com.evil.test/explore/custom-routes/test",
+		"http://www.alltrails.com/explore/custom-routes/test",
+		"https://user:secret@www.alltrails.com/explore/custom-routes/test",
+		"https://www.alltrails.com:8443/explore/custom-routes/test",
+		"https://www.alltrails.com/explore/custom-routes/",
+		"https://www.alltrails.com/explore/custom-routes/test/other",
+	} {
+		bad := occurrence(editor, 3)
+		bad.Tags = append(bad.Tags, nostr.Tag{"bitcoinwalk-route", "alltrails-v1"}, nostr.Tag{"r", route})
+		bad.Sign(editor)
+		if policy.checkOrganizerCalendar(bad, true) == nil {
+			t.Fatalf("unsafe custom route accepted: %s", route)
+		}
+	}
+	forbiddenRoute := occurrence(stranger, 3)
+	forbiddenRoute.Tags = append(forbiddenRoute.Tags, nostr.Tag{"bitcoinwalk-route", "alltrails-v1"}, nostr.Tag{"r", customRoute})
+	forbiddenRoute.Sign(stranger)
+	deny(t, relay, forbiddenRoute)
 	badGeohash := occurrence(editor, 3)
 	for i, tag := range badGeohash.Tags {
 		if tag[0] == "g" {

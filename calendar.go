@@ -16,7 +16,7 @@ import (
 )
 
 var managedWalkImagePattern = regexp.MustCompile(`^https://(?:app-staging\.)?bitcoinwalk\.org/api/media/files/[0-9a-f]{64}\.webp$`)
-var allTrailsRoutePattern = regexp.MustCompile(`^https://www\.alltrails\.com/explore/trail/[A-Za-z0-9._~!$&'()*+,;=:@%/-]+(?:\?[A-Za-z0-9._~!$&'()*+,;=:@%/?-]*)?$`)
+var allTrailsRoutePattern = regexp.MustCompile(`^https://www\.alltrails\.com/explore/(?:trail/[A-Za-z0-9._~!$&'()*+,;=:@%/-]+|custom-routes/[A-Za-z0-9][A-Za-z0-9-]*/?)(?:\?[A-Za-z0-9._~!$&'()*+,;=:@%/?-]*)?$`)
 
 const geohashAlphabet = "0123456789bcdefghjkmnpqrstuvwxyz"
 
