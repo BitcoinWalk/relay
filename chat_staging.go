@@ -49,6 +49,7 @@ func runChat() error {
 	}
 	r := newChatRelay(s)
 	r.ServiceURL = public.String()
+	registerChatUploadAuthorization(r, s)
 	if mode == "production" {
 		r.Info.Name = "BitcoinWalk Community"
 		r.Info.Description = "BitcoinWalk public city channels and access-controlled organizer communities."

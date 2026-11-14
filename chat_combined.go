@@ -208,5 +208,6 @@ func enableCombinedCityChat(relay *khatru.Relay) (*chatstate.Store, error) {
 		return nil, err
 	}
 	relay.ServiceURL = public.String()
+	registerChatUploadAuthorization(relay, store)
 	return store, nil
 }

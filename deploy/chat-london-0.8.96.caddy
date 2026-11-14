@@ -23,6 +23,9 @@ chat-london.bitcoinwalk.org {
 		handle /healthz {
 			reverse_proxy 127.0.0.1:3346
 		}
+		handle /api/chat/upload-authorization {
+			reverse_proxy 127.0.0.1:3346
+		}
 		handle {
 			respond "BitcoinWalk London community relay." 404
 		}

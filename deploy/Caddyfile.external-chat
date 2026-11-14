@@ -27,6 +27,9 @@ chat-staging.bitcoinwalk.org {
 		handle /healthz {
 			reverse_proxy 127.0.0.1:3335
 		}
+		handle /api/chat/upload-authorization {
+			reverse_proxy 127.0.0.1:3335
+		}
 		handle /join-chat {
 			root * /srv/bitcoinwalk-chat-staging/join-site
 			header Referrer-Policy no-referrer

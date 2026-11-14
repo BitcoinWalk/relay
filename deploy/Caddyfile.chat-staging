@@ -23,6 +23,9 @@ chat-staging.bitcoinwalk.org {
 	handle /healthz {
 		reverse_proxy 127.0.0.1:3335
 	}
+	handle /api/chat/upload-authorization {
+		reverse_proxy 127.0.0.1:3335
+	}
 	# Chooser route is enabled only after the admin-created group is verified.
 	handle /join-chat {
 		respond "Chat staging is being prepared. Joining is not enabled yet." 503
